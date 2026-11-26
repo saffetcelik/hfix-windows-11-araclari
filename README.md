@@ -75,7 +75,15 @@ cargo +stable-x86_64-pc-windows-gnu build --release
 
 `Cargo.toml` içindeki `version` satırı artırılıp `main` dalına gönderilir. [GitHub Actions iş akışı](.github/workflows/surum.yml) programı derler, testleri çalıştırır, exe'yi imzalar ve `v<sürüm>` etiketli sürümü iki dosyasıyla (`HFixWin11.exe`, `HFixWin11.exe.sig`) yayımlar. Kurulu programlar yeni sürümü kendiliğinden indirir.
 
-İmza anahtarının gizli yarısı depoda durmaz; `HFIX_IMZA_ANAHTARI` adlı depo sırrından okunur. Anahtar `HFixWin11.exe --anahtar-uret <dosya>` ile bir kez üretilmiştir. Kaybolursa yeni anahtarla imzalanan sürümleri kurulu programlar kabul etmez.
+Aynı iş elle de yapılabilir (Actions kullanılamadığında): sürüm artırılıp commit edildikten sonra
+
+```powershell
+powershell -ExecutionPolicy Bypass -File yayimla.ps1 -Anahtar <gizli anahtar dosyası>
+```
+
+programı derler, test eder, imzalar, imzayı programdaki açık anahtarla doğrular ve sürümü yayımlar.
+
+İmza anahtarının gizli yarısı depoda durmaz; iş akışı onu `HFIX_IMZA_ANAHTARI` adlı depo sırrından okur. Anahtar `HFixWin11.exe --anahtar-uret <dosya>` ile bir kez üretilmiştir. Kaybolursa yeni anahtarla imzalanan sürümleri kurulu programlar kabul etmez.
 
 ## Lisans
 
