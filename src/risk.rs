@@ -219,7 +219,17 @@ fn files(out: &mut Vec<Finding>, progress: &dyn Fn(&str)) {
             checked += 1;
             match sig::verify_cached(&ps).status {
                 Status::Invalid => add(out, &ps, Risk::Unsigned, &name, &tr!("{} imzası geçersiz program (imzalandıktan sonra değişmiş)", "Program with an invalid signature {} (changed after it was signed)", place), &ps, Origin::File),
-                Status::Unsigned => add(out, &ps, Risk::Unsigned, &name, &tr!("{} imzasız program", "Unsigned program {}", place), &ps, Origin::File),
+                Status::Unsigned => {
+                    let mut why = tr!("{} imzasız program", "Unsigned program {}", place);
+                    // npm paketleri (esbuild, node-gyp vb.) imzasiz gelir; zararli demek degildir.
+                    if ps.to_lowercase().contains("\\node_modules\\") {
+                        why += t(
+                            " — node_modules içinde: büyük olasılıkla bir geliştirici aracı (npm paketi)",
+                            " — inside node_modules: most likely a developer tool (npm package)",
+                        );
+                    }
+                    add(out, &ps, Risk::Unsigned, &name, &why, &ps, Origin::File)
+                }
                 _ => {}
             }
         }

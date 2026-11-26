@@ -820,6 +820,7 @@ impl NetMon {
 }
 
 /// FB_DEBUG ortam degiskeni bir dosya yolu ise asama kayitlarini oraya ekler.
+#[allow(dead_code)]
 pub fn stage(msg: &str) {
     if let Ok(p) = std::env::var("FB_DEBUG") {
         use std::io::Write;

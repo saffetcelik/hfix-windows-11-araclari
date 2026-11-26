@@ -8,12 +8,23 @@ use crate::mon::{self, Cmd, Snapshot};
 use crate::sig::Risk;
 use crate::startup::{self, Item, Kind};
 use crate::win::{self, PowerMode};
-use crate::{cfg, fb, pal, pct, risk_color, App};
+use crate::{card, cfg, chart, fb, heat, pal, primary, risk_color, App};
 use eframe::egui::{self, RichText};
 use egui_extras::{Column, TableBuilder};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+/// Baslangic listesindeki grup: 0 etkin, 1 imzasiz / supheli, 2 kapali.
+fn startup_group(it: &Item) -> u8 {
+    if it.risk >= Risk::Unsigned {
+        1
+    } else if it.enabled {
+        0
+    } else {
+        2
+    }
+}
 
 fn prog_key(p: &Program) -> String {
     format!("{}|{}", p.name, p.version)
@@ -184,8 +195,22 @@ impl App {
                 _ => x.enabled.cmp(&y.enabled).then_with(|| x.risk.cmp(&y.risk)),
             };
             let o = if sdesc { o.reverse() } else { o };
-            o.then_with(|| x.name.to_lowercase().cmp(&y.name.to_lowercase()))
+            // Once gruba gore (etkin, imzasiz / supheli, kapali), grup icinde secilen sutuna gore.
+            startup_group(x)
+                .cmp(&startup_group(y))
+                .then(o)
+                .then_with(|| x.name.to_lowercase().cmp(&y.name.to_lowercase()))
         });
+        // Tablo satirlari: her grubun basinda bir baslik satiri.
+        let mut rows: Vec<(Option<usize>, u8, usize)> = Vec::new();
+        for &i in &shown {
+            let g = startup_group(&items[i]);
+            if rows.last().map(|r| r.1) != Some(g) {
+                let n = shown.iter().filter(|&&j| startup_group(&items[j]) == g).count();
+                rows.push((None, g, n));
+            }
+            rows.push((Some(i), g, 0));
+        }
         let mut sort = self.ui.startup_sort;
 
         ui.horizontal(|ui| {
@@ -245,6 +270,7 @@ impl App {
         ui.add_space(4.0);
 
         let mut toggle: Option<(usize, bool)> = None;
+        let weak_col = ui.visuals().weak_text_color();
         TableBuilder::new(ui)
             .striped(true)
             .resizable(true)
@@ -273,8 +299,40 @@ impl App {
                 });
             })
             .body(|body| {
-                body.rows(22.0, shown.len(), |mut row| {
-                    let i = shown[row.index()];
+                body.rows(24.0, rows.len(), |mut row| {
+                    let (item, group, count) = rows[row.index()];
+                    let Some(i) = item else {
+                        let (col, title, hint) = match group {
+                            0 => (
+                                c.green,
+                                t("Etkin", "Enabled"),
+                                t("Windows açılırken başlıyor", "Starts with Windows"),
+                            ),
+                            1 => (
+                                c.orange,
+                                t("İmzasız / şüpheli", "Unsigned / suspicious"),
+                                t("Yayıncısı doğrulanamadı; tanımıyorsanız kapatın", "Publisher not verified; turn off if you don't recognize it"),
+                            ),
+                            _ => (
+                                weak_col,
+                                t("Kapalı", "Off"),
+                                t("Başlangıçta açılmıyor", "Does not start with Windows"),
+                            ),
+                        };
+                        row.col(|ui| {
+                            ui.colored_label(col, "■");
+                        });
+                        row.col(|ui| {
+                            ui.label(RichText::new(format!("{title} ({count})")).strong().color(col));
+                        });
+                        row.col(|ui| {
+                            ui.label(RichText::new(hint).weak());
+                        });
+                        for _ in 0..4 {
+                            row.col(|_| {});
+                        }
+                        return;
+                    };
                     let it = &items[i];
                     let rc = risk_color(c, it.risk);
                     row.col(|ui| {
@@ -1141,290 +1199,461 @@ impl App {
         }
 
         egui::ScrollArea::vertical().show(ui, |ui| {
+            let full = ui.available_width() - 28.0;
+            // Dar pencerede kartlar alt alta, genis pencerede yan yana dizilir.
+            let wide = full >= 880.0;
+            let half = if wide { (full - 36.0) / 2.0 } else { full };
             ui.add_space(6.0);
-            ui.heading(t("İşlemci güç modu", "CPU power mode"));
-            ui.label(t(
-                "Fan hızını donanım (BIOS) belirler; program onu işlemcinin ürettiği ısıyı azaltarak düşürür. \
-                 Modlar ayrı bir \"HFix\" güç planına yazılır; kendi planlarınıza dokunulmaz ve aşağıdan tek tıkla geri dönebilirsiniz.",
-                "Fan speed is set by the hardware (BIOS); the program lowers it by reducing the heat the CPU produces. \
-                 Modes are written to a separate \"HFix\" power plan; your own plans are not touched and you can switch back below with one click.",
-            ));
+
             let ours = s.power.plan_guid.eq_ignore_ascii_case(win::FB_PLAN);
-            let hex = |v: Option<(u32, u32)>| v.map_or("?".to_string(), |x| x.0.to_string());
-            let boost = match s.power.boost.map(|b| b.0) {
-                Some(0) => t("kapalı", "off"),
-                Some(1) => t("açık", "on"),
-                Some(2) => t("agresif", "aggressive"),
-                Some(3) => t("verimli", "efficient"),
-                Some(4) => t("verimli agresif", "efficient aggressive"),
-                Some(_) => t("özel", "custom"),
-                None => "?",
+            let modes = [PowerMode::Quiet, PowerMode::Smart, PowerMode::Performance, PowerMode::Max];
+            let active = modes.into_iter().find(|m| ours && m.names_plan(&s.power.plan));
+            let mode_color = |m: PowerMode| match m {
+                PowerMode::Quiet | PowerMode::Smart => c.green,
+                PowerMode::Performance => c.blue,
+                PowerMode::Max => c.red,
             };
-            ui.label(
-                RichText::new(tr!(
-                    "Şu an (prizde): plan \"{}\" · alt sınır %{} · üst sınır %{} · enerji tercihi (EPP) {} · turbo {}",
-                    "Now (plugged in): plan \"{}\" · minimum {}% · maximum {}% · energy preference (EPP) {} · turbo {}",
-                    s.power.plan,
-                    hex(s.power.min),
-                    hex(s.power.max),
-                    hex(s.power.epp),
-                    boost
-                ))
-                .strong(),
-            );
-            ui.add_space(4.0);
-            let modes = [
-                (
-                    PowerMode::Quiet,
-                    t(
-                        "Turbo kapalı, üst sınır %99. En serin ve en sessiz mod; ağır işlerde yaklaşık %30 yavaşlar.",
-                        "Turbo off, maximum 99%. The coolest and quietest mode; heavy work runs about 30% slower.",
-                    ),
-                ),
-                (
-                    PowerMode::Smart,
-                    t(
-                        "ÖNERİLEN. Boştayken frekansı düşürüp soğur, yük gelince tam hıza ve turboya çıkar. Günlük kullanım ve VMware için dengeli.",
-                        "RECOMMENDED. Lowers the frequency and cools down when idle, goes to full speed and turbo under load. Balanced for daily use and VMware.",
-                    ),
-                ),
-                (
-                    PowerMode::Performance,
-                    t(
-                        "Yük altında en yüksek hız (agresif turbo, tüm çekirdekler uyanık); ama boştayken frekansı düşürür. Performanstan ödün vermeden fanı dinlendirir.",
-                        "Maximum speed under load (aggressive turbo, all cores awake), but lowers the frequency when idle. Rests the fan without giving up performance.",
-                    ),
-                ),
-                (
-                    PowerMode::Max,
-                    t(
-                        "İşlemci hep en yüksek frekansta. Fan sürekli hızlı döner; yalnızca gerektiğinde kullanın.",
-                        "CPU always at maximum frequency. The fan runs fast all the time; use only when needed.",
-                    ),
-                ),
-            ];
-            for (mode, desc) in modes {
-                let active = ours && mode.names_plan(&s.power.plan);
-                egui::Frame::group(ui.style()).show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        let col = match mode {
-                            PowerMode::Max => c.red,
-                            PowerMode::Smart | PowerMode::Quiet => c.green,
-                            PowerMode::Performance => c.blue,
+
+            // ---- su anki durum
+            card(ui).show(ui, |ui| {
+                ui.set_width(full);
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.set_min_width(230.0);
+                        ui.label(RichText::new(t("Etkin güç modu", "Active power mode")).strong());
+                        match active {
+                            Some(m) => ui.label(RichText::new(m.title()).size(30.0).strong().color(mode_color(m))),
+                            None => ui.label(RichText::new(t("Özel plan", "Custom plan")).size(30.0).strong()),
                         };
-                        if ui
-                            .add_sized(
-                                [170.0, 30.0],
-                                egui::Button::new(RichText::new(mode.title()).strong().color(col)),
-                            )
-                            .clicked()
-                        {
-                            self.send(Cmd::Power(mode));
-                        }
-                        if active {
-                            ui.colored_label(c.green, t("● etkin", "● active"));
-                        }
-                        ui.add(egui::Label::new(desc).wrap());
+                        ui.label(RichText::new(tr!("Plan: {}", "Plan: {}", s.power.plan)).weak());
+                    });
+                    ui.add_space(16.0);
+                    ui.vertical(|ui| {
+                        let w = (full - 270.0).clamp(240.0, 760.0);
+                        ui.label(
+                            RichText::new(tr!(
+                                "İşlemci  %{:.0}  ·  {} MHz",
+                                "CPU  {:.0}%  ·  {} MHz",
+                                s.cpu,
+                                s.freq
+                            ))
+                            .strong(),
+                        );
+                        chart(ui, &s.cpu_hist, heat(c, s.cpu, 40.0, 75.0), w, 46.0);
+                        let num = |v: Option<(u32, u32)>| v.map_or("?".to_string(), |x| x.0.to_string());
+                        let boost = match s.power.boost.map(|b| b.0) {
+                            Some(0) => t("kapalı", "off"),
+                            Some(1) => t("açık", "on"),
+                            Some(2) => t("agresif", "aggressive"),
+                            Some(3) => t("verimli", "efficient"),
+                            Some(4) => t("verimli agresif", "efficient aggressive"),
+                            Some(_) => t("özel", "custom"),
+                            None => "?",
+                        };
+                        ui.horizontal_wrapped(|ui| {
+                            chip(ui, t("Alt sınır", "Minimum"), &tr!("%{}", "{}%", num(s.power.min)));
+                            chip(ui, t("Üst sınır", "Maximum"), &tr!("%{}", "{}%", num(s.power.max)));
+                            chip(ui, t("Enerji tercihi", "Energy preference"), &num(s.power.epp));
+                            chip(ui, "Turbo", boost);
+                        })
+                        .response
+                        .on_hover_text(t(
+                            "Prizdeyken geçerli değerler. Enerji tercihi (EPP): 0 en yüksek hız, 100 en çok tasarruf.",
+                            "Values that apply when plugged in. Energy preference (EPP): 0 is maximum speed, 100 is maximum saving.",
+                        ));
                     });
                 });
-            }
-            ui.add_space(4.0);
-            ui.label(RichText::new(t("Tüm güç planları", "All power plans")).strong());
-            for p in &s.power.plans {
-                ui.horizontal(|ui| {
-                    if p.active {
-                        ui.colored_label(c.green, t("● etkin", "● active"));
-                    } else if ui.small_button(t("Etkinleştir", "Activate")).clicked() {
-                        self.send(Cmd::PowerPlan(p.guid.clone(), p.name.clone()));
-                    }
-                    ui.label(&p.name);
-                });
-            }
+            });
+            ui.add_space(8.0);
 
-            ui.add_space(12.0);
-            ui.separator();
-            ui.heading(t("Bellek", "Memory"));
-            ui.horizontal(|ui| {
-                if ui.button(t("RAM'i şimdi temizle", "Clean RAM now")).clicked() {
-                    self.tab = crate::Tab::Mem;
-                    self.ram_clean(s.ram_seq);
+            // ---- mod secimi
+            card(ui).show(ui, |ui| {
+                ui.set_width(full);
+                ui.label(RichText::new(t("Mod seçin", "Choose a mode")).size(16.0).strong());
+                ui.label(
+                    RichText::new(t(
+                        "Fan hızını donanım belirler; mod, işlemcinin ürettiği ısıyı azaltarak fanı yavaşlatır. Modlar ayrı bir \"HFix\" güç planına yazılır, kendi planlarınıza dokunulmaz.",
+                        "Fan speed is set by the hardware; a mode slows the fan by reducing the heat the CPU produces. Modes are written to a separate \"HFix\" power plan; your own plans are not touched.",
+                    ))
+                    .weak(),
+                );
+                ui.add_space(6.0);
+                // (mod, kisa tanim, sessizlik 0-5, hiz 0-5, aciklama)
+                let info = [
+                    (
+                        PowerMode::Quiet,
+                        t("En serin ve en sessiz", "Coolest and quietest"),
+                        5,
+                        2,
+                        t(
+                            "Turbo kapalı, üst sınır %99. Ağır işlerde yaklaşık %30 yavaşlar.",
+                            "Turbo off, maximum 99%. Heavy work runs about 30% slower.",
+                        ),
+                    ),
+                    (
+                        PowerMode::Smart,
+                        t("Önerilen · günlük kullanım", "Recommended · daily use"),
+                        4,
+                        4,
+                        t(
+                            "Boştayken frekansı düşürüp soğur, yük gelince tam hıza ve turboya çıkar.",
+                            "Lowers the frequency and cools down when idle, goes to full speed and turbo under load.",
+                        ),
+                    ),
+                    (
+                        PowerMode::Performance,
+                        t("Yük altında en hızlı", "Fastest under load"),
+                        3,
+                        5,
+                        t(
+                            "Agresif turbo, tüm çekirdekler uyanık; boştayken yine de frekansı düşürür.",
+                            "Aggressive turbo, all cores awake; still lowers the frequency when idle.",
+                        ),
+                    ),
+                    (
+                        PowerMode::Max,
+                        t("Her zaman tam hız", "Always full speed"),
+                        1,
+                        5,
+                        t(
+                            "İşlemci hep en yüksek frekansta. Fan sürekli hızlı döner; yalnızca gerektiğinde kullanın.",
+                            "CPU always at maximum frequency. The fan runs fast all the time; use only when needed.",
+                        ),
+                    ),
+                ];
+                // Pencere genisligine gore satir basina 4, 2 ya da 1 kart.
+                let per_row = if full >= 1060.0 {
+                    4
+                } else if full >= 560.0 {
+                    2
+                } else {
+                    1
+                };
+                let gap = 10.0;
+                let cw = ((full - gap * (per_row as f32 - 1.0)) / per_row as f32 - 26.0).max(200.0);
+                for row in info.chunks(per_row) {
+                    ui.horizontal_top(|ui| {
+                        ui.spacing_mut().item_spacing.x = gap;
+                        for (mode, tag, quiet, speed, desc) in row {
+                            let on = active == Some(*mode);
+                            let col = mode_color(*mode);
+                            let mut frame = egui::Frame::group(ui.style()).rounding(8.0).inner_margin(12.0);
+                            if on {
+                                frame = frame.stroke(egui::Stroke::new(2.0_f32, col));
+                            }
+                            frame.show(ui, |ui| {
+                                ui.vertical(|ui| {
+                                    ui.set_width(cw);
+                                    ui.horizontal(|ui| {
+                                        ui.label(RichText::new(mode.title()).size(18.0).strong().color(col));
+                                        if on {
+                                            ui.colored_label(c.green, t("■ etkin", "■ active"));
+                                        }
+                                    });
+                                    ui.label(RichText::new(*tag).strong());
+                                    ui.add_space(4.0);
+                                    meter(ui, t("Sessizlik", "Quietness"), *quiet, c.green);
+                                    meter(ui, t("Hız", "Speed"), *speed, c.blue);
+                                    ui.add_space(4.0);
+                                    ui.add(egui::Label::new(RichText::new(*desc).weak()).wrap());
+                                    ui.add_space(6.0);
+                                    if on {
+                                        ui.add_enabled(false, egui::Button::new(t("Bu mod etkin", "This mode is active")).min_size(egui::vec2(cw, 32.0)));
+                                    } else if ui
+                                        .add(primary(t("Bu modu uygula", "Apply this mode")).min_size(egui::vec2(cw, 32.0)))
+                                        .clicked()
+                                    {
+                                        self.send(Cmd::Power(*mode));
+                                    }
+                                });
+                            });
+                        }
+                    });
+                    ui.add_space(6.0);
                 }
-                ui.label(t(
-                    "Sanal makine (VMware) süreçlerine dokunulmaz.",
-                    "Virtual machine (VMware) processes are not touched.",
-                ));
             });
-            let mut a = self.cfg.auto;
-            ui.horizontal(|ui| {
-                ui.checkbox(
-                    &mut a.ram_on,
-                    t(
-                        "Bellek kullanımı şu oranı geçince otomatik temizle:",
-                        "Clean automatically when memory usage exceeds:",
-                    ),
-                );
-                ui.add(egui::Slider::new(&mut a.ram_pct, 50..=95).suffix(" %"));
-            });
+            ui.add_space(8.0);
 
-            ui.add_space(12.0);
-            ui.separator();
-            ui.heading(t("Otomatik kısma", "Automatic throttling"));
-            ui.horizontal(|ui| {
-                ui.checkbox(
-                    &mut a.thr_on,
-                    t(
-                        "30 saniye boyunca şu orandan fazla CPU kullanan süreçleri otomatik kıs:",
-                        "Automatically throttle processes that use more CPU than this for 30 seconds:",
-                    ),
-                );
-                ui.add(egui::Slider::new(&mut a.thr_pct, 5..=90).suffix(" %"));
-            });
-            ui.label(
-                RichText::new(t(
-                    "Kısılan süreç kapanmaz; düşük öncelik + verimlilik moduna alınır. Sistem ve VMware süreçleri hariç tutulur. \
-                     O an kullandığınız ağır program (derleme, video işleme) da kısılabilir; Süreçler sekmesinden geri alınır.",
-                    "A throttled process is not closed; it is switched to low priority + efficiency mode. System and VMware processes are excluded. \
-                     A heavy program you are using at the moment (compiling, video processing) may also be throttled; undo it from the Processes tab.",
-                ))
-                .weak(),
+            // ---- otomatik kisma + program secenekleri
+            let mut a = self.cfg.auto;
+            let two = |ui: &mut egui::Ui, left: &mut dyn FnMut(&mut egui::Ui), right: &mut dyn FnMut(&mut egui::Ui)| {
+                if wide {
+                    ui.horizontal_top(|ui| {
+                        left(ui);
+                        right(ui);
+                    });
+                } else {
+                    left(ui);
+                    ui.add_space(8.0);
+                    right(ui);
+                }
+            };
+            let mut remove: Option<String> = None;
+            let rules = self.cfg.rules.clone();
+            let cur = self.ui.autostart.lock().ok().and_then(|g| *g);
+            let mut set_autostart: Option<bool> = None;
+            let mut flush = false;
+            let mut clean_ram = false;
+            two(
+                ui,
+                &mut |ui| {
+                    card(ui).show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            ui.set_width(half);
+                            ui.label(RichText::new(t("Otomatik kısma", "Automatic throttling")).size(16.0).strong());
+                            ui.checkbox(
+                                &mut a.thr_on,
+                                t(
+                                    "İşlemciyi 30 saniye boyunca çok kullanan programları kıs",
+                                    "Throttle programs that use a lot of CPU for 30 seconds",
+                                ),
+                            );
+                            ui.horizontal(|ui| {
+                                ui.label(t("Eşik:", "Threshold:"));
+                                ui.add_enabled(a.thr_on, egui::Slider::new(&mut a.thr_pct, 5..=90).suffix(" %"));
+                            });
+                            ui.add(
+                                egui::Label::new(
+                                    RichText::new(t(
+                                        "Kısılan program kapanmaz; düşük öncelik ve verimlilik moduna alınır. Sistem ve sanal makine süreçleri hariç tutulur. O an kullandığınız ağır program da kısılabilir; Süreçler sayfasından geri alınır.",
+                                        "A throttled program is not closed; it is switched to low priority and efficiency mode. System and virtual machine processes are excluded. A heavy program you are using may also be throttled; undo it on the Processes page.",
+                                    ))
+                                    .weak(),
+                                )
+                                .wrap(),
+                            );
+                            if !rules.is_empty() {
+                                ui.add_space(6.0);
+                                ui.label(RichText::new(t("Her zaman kısılan programlar", "Programs always throttled")).strong());
+                                ui.horizontal_wrapped(|ui| {
+                                    for r in &rules {
+                                        if ui
+                                            .button(format!("{r}  ✖"))
+                                            .on_hover_text(t("Kuralı kaldır", "Remove rule"))
+                                            .clicked()
+                                        {
+                                            remove = Some(r.clone());
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    });
+                },
+                &mut |ui| {
+                    card(ui).show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            ui.set_width(half);
+                            ui.label(RichText::new(t("Bellek ve program", "Memory and program")).size(16.0).strong());
+                            ui.checkbox(
+                                &mut a.ram_on,
+                                t(
+                                    "Bellek dolunca RAM'i otomatik temizle",
+                                    "Clean RAM automatically when memory fills up",
+                                ),
+                            );
+                            ui.horizontal(|ui| {
+                                ui.label(t("Eşik:", "Threshold:"));
+                                ui.add_enabled(a.ram_on, egui::Slider::new(&mut a.ram_pct, 50..=95).suffix(" %"));
+                            });
+                            ui.add_space(4.0);
+                            match cur {
+                                None => {
+                                    ui.label(RichText::new(t("Otomatik başlatma durumu okunuyor…", "Reading the autostart status…")).weak());
+                                }
+                                Some(v) => {
+                                    let mut on = v;
+                                    if ui
+                                        .checkbox(&mut on, t("Windows açılışında otomatik başlat", "Start with Windows"))
+                                        .on_hover_text(t(
+                                            "Simge durumunda ve yönetici onayı sormadan başlar. Bunun için bir zamanlanmış görev oluşturulur.",
+                                            "Starts minimized and without asking for administrator approval. A scheduled task is created for this.",
+                                        ))
+                                        .changed()
+                                    {
+                                        set_autostart = Some(on);
+                                    }
+                                }
+                            }
+                            ui.add_space(6.0);
+                            ui.horizontal_wrapped(|ui| {
+                                if ui.button(t("RAM'i şimdi temizle", "Clean RAM now")).clicked() {
+                                    clean_ram = true;
+                                }
+                                if ui.button(t("DNS önbelleğini temizle", "Flush DNS cache")).clicked() {
+                                    flush = true;
+                                }
+                            });
+                        });
+                    });
+                },
             );
             if a != self.cfg.auto {
                 self.cfg.auto = a;
                 cfg::save(&self.cfg);
                 self.send(Cmd::Auto(a));
             }
-            if !self.cfg.rules.is_empty() {
-                ui.add_space(4.0);
-                ui.label(
-                    RichText::new(t("Her zaman kısılan programlar", "Programs always throttled"))
-                        .strong(),
-                );
-                let mut remove: Option<String> = None;
-                ui.horizontal_wrapped(|ui| {
-                    for r in &self.cfg.rules {
-                        if ui
-                            .button(format!("{r}  ✖"))
-                            .on_hover_text(t("Kuralı kaldır", "Remove rule"))
-                            .clicked()
-                        {
-                            remove = Some(r.clone());
-                        }
-                    }
-                });
-                if let Some(r) = remove {
-                    self.cfg.rules.retain(|x| x != &r);
-                    cfg::save(&self.cfg);
-                    self.send(Cmd::Rules(self.cfg.rules.clone()));
-                }
+            if let Some(r) = remove {
+                self.cfg.rules.retain(|x| x != &r);
+                cfg::save(&self.cfg);
+                self.send(Cmd::Rules(self.cfg.rules.clone()));
             }
-
-            ui.add_space(12.0);
-            ui.separator();
-            ui.heading(t("Program ayarları", "Program settings"));
-            let cur = self.ui.autostart.lock().ok().and_then(|g| *g);
-            match cur {
-                None => {
-                    ui.label(t(
-                        "Otomatik başlatma durumu okunuyor…",
-                        "Reading the autostart status…",
-                    ));
-                }
-                Some(v) => {
-                    let mut on = v;
-                    if ui
-                        .checkbox(
-                            &mut on,
-                            t(
-                                "Windows açılışında otomatik başlat (simge durumunda, yönetici onayı sormadan)",
-                                "Start with Windows (minimized, without asking for administrator approval)",
-                            ),
+            if flush {
+                self.send(Cmd::FlushDns);
+            }
+            if clean_ram {
+                self.tab = crate::Tab::Mem;
+                self.ram_clean(s.ram_seq);
+            }
+            if let Some(on) = set_autostart {
+                let (a2, tx, ctx) = (self.ui.autostart.clone(), self.tx.clone(), ui.ctx().clone());
+                std::thread::spawn(move || {
+                    let ok = win::autostart_set(on);
+                    let now = win::autostart_enabled();
+                    if let Ok(mut g) = a2.lock() {
+                        *g = Some(now);
+                    }
+                    let _ = tx.send(Cmd::Note(if ok {
+                        tr!(
+                            "Otomatik başlatma {}.",
+                            "Autostart {}.",
+                            if on { t("açıldı", "turned on") } else { t("kapatıldı", "turned off") }
                         )
-                        .changed()
-                    {
-                        let (a2, tx, ctx) =
-                            (self.ui.autostart.clone(), self.tx.clone(), ui.ctx().clone());
-                        std::thread::spawn(move || {
-                            let ok = win::autostart_set(on);
-                            let now = win::autostart_enabled();
-                            if let Ok(mut g) = a2.lock() {
-                                *g = Some(now);
-                            }
-                            let _ = tx.send(Cmd::Note(if ok {
-                                tr!(
-                                    "Otomatik başlatma {}.",
-                                    "Autostart {}.",
-                                    if on {
-                                        t("açıldı", "turned on")
-                                    } else {
-                                        t("kapatıldı", "turned off")
-                                    }
-                                )
-                            } else {
-                                t(
-                                    "Otomatik başlatma değiştirilemedi (yönetici modu gerekir).",
-                                    "Autostart could not be changed (administrator mode required).",
-                                )
-                                .into()
-                            }));
-                            ctx.request_repaint();
-                        });
-                    }
-                    ui.label(
-                        RichText::new(t(
-                            "Bu seçenek bir zamanlanmış görev oluşturur. Programı Başlangıç klasörüne kısayolla eklerseniz her açılışta yönetici onayı (UAC) sorulur; bu yöntemde sorulmaz.",
-                            "This option creates a scheduled task. If you add the program to the Startup folder with a shortcut, administrator approval (UAC) is asked at every start; with this method it is not.",
-                        ))
-                        .weak(),
-                    );
-                }
+                    } else {
+                        t(
+                            "Otomatik başlatma değiştirilemedi (yönetici modu gerekir).",
+                            "Autostart could not be changed (administrator mode required).",
+                        )
+                        .into()
+                    }));
+                    ctx.request_repaint();
+                });
             }
-            ui.horizontal(|ui| {
-                if ui.button(t("DNS önbelleğini temizle", "Flush DNS cache")).clicked() {
-                    self.send(Cmd::FlushDns);
-                }
-            });
+            ui.add_space(8.0);
 
-            ui.add_space(12.0);
-            ui.separator();
-            ui.heading(t(
-                "Son 1 dakikada işlemciyi en çok ısıtanlar",
-                "What heated the CPU most in the last minute",
-            ));
+            // ---- en cok isitanlar + cekirdekler
             let mut agg: HashMap<&str, (f32, Vec<u32>)> = HashMap::new();
             for p in &s.procs {
                 let e = agg.entry(p.name.as_str()).or_default();
                 e.0 += p.avg;
                 e.1.push(p.pid);
             }
-            let mut v: Vec<_> = agg.into_iter().collect();
-            v.sort_by(|a, b| b.1 .0.total_cmp(&a.1 .0));
-            egui::Grid::new("hot").num_columns(3).striped(true).show(ui, |ui| {
-                for (name, (avg, pids)) in v.into_iter().take(8) {
-                    if avg < 0.3 {
-                        break;
-                    }
-                    ui.label(name);
-                    pct(ui, c, avg);
-                    if mon::is_critical(name) || mon::is_vm(name) {
-                        ui.label("");
-                    } else if ui.small_button(t("Kıs", "Throttle")).clicked() {
-                        self.send(Cmd::Throttle(pids, true));
-                    }
-                    ui.end_row();
-                }
-            });
+            let mut hot: Vec<_> = agg.into_iter().filter(|x| x.1 .0 >= 0.3).collect();
+            hot.sort_by(|x, y| y.1 .0.total_cmp(&x.1 .0));
+            hot.truncate(6);
+            let mut throttle: Option<Vec<u32>> = None;
+            two(
+                ui,
+                &mut |ui| {
+                    card(ui).show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            ui.set_width(half);
+                            ui.label(
+                                RichText::new(t(
+                                    "Son 1 dakikada işlemciyi en çok ısıtanlar",
+                                    "What heated the CPU most in the last minute",
+                                ))
+                                .size(16.0)
+                                .strong(),
+                            );
+                            if hot.is_empty() {
+                                ui.label(RichText::new(t("Şu an işlemciyi yoran bir program yok.", "No program is loading the CPU right now.")).weak());
+                            }
+                            let top = hot.first().map_or(1.0, |x| x.1 .0).max(1.0);
+                            for (name, (avg, pids)) in &hot {
+                                ui.horizontal(|ui| {
+                                    ui.allocate_ui_with_layout(egui::vec2(150.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                                        ui.set_min_width(150.0);
+                                        ui.add(egui::Label::new(*name).truncate());
+                                    });
+                                    crate::stack_bar(ui, (half - 320.0).max(60.0), 12.0, &[(avg / top, heat(c, *avg, 5.0, 15.0))]);
+                                    ui.add_sized([52.0, 20.0], egui::Label::new(tr!("%{:.1}", "{:.1}%", avg)));
+                                    if !mon::is_critical(name) && !mon::is_vm(name) && ui.small_button(t("Kıs", "Throttle")).clicked() {
+                                        throttle = Some(pids.clone());
+                                    }
+                                });
+                            }
+                        });
+                    });
+                },
+                &mut |ui| {
+                    card(ui).show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            ui.set_width(half);
+                            ui.label(RichText::new(t("Çekirdek başına yük", "Load per core")).size(16.0).strong());
+                            let bw = ((half - 8.0 * 3.0) / 4.0).clamp(70.0, 200.0);
+                            ui.horizontal_wrapped(|ui| {
+                                for (i, core) in s.cores.iter().enumerate() {
+                                    ui.add(
+                                        egui::ProgressBar::new(core / 100.0)
+                                            .desired_width(bw)
+                                            .text(tr!("Ç{} %{:.0}", "C{} {:.0}%", i + 1, core)),
+                                    );
+                                }
+                            });
+                        });
+                    });
+                },
+            );
+            if let Some(pids) = throttle {
+                self.send(Cmd::Throttle(pids, true));
+            }
             ui.add_space(8.0);
-            ui.label(RichText::new(t("Çekirdek başına yük", "Load per core")).strong());
-            ui.horizontal_wrapped(|ui| {
-                for (i, core) in s.cores.iter().enumerate() {
-                    ui.add(
-                        egui::ProgressBar::new(core / 100.0)
-                            .desired_width(110.0)
-                            .text(tr!("Ç{} %{:.0}", "C{} {:.0}%", i + 1, core)),
-                    );
+
+            // ---- tum guc planlari
+            card(ui).show(ui, |ui| {
+                ui.set_width(full);
+                ui.label(RichText::new(t("Tüm güç planları", "All power plans")).size(16.0).strong());
+                ui.label(
+                    RichText::new(t(
+                        "Kendi planınıza dönmek için \"Etkinleştir\"e basın.",
+                        "Press \"Activate\" to switch back to one of your own plans.",
+                    ))
+                    .weak(),
+                );
+                for p in &s.power.plans {
+                    ui.horizontal(|ui| {
+                        if p.active {
+                            ui.add_sized([96.0, 22.0], egui::Label::new(RichText::new(t("■ etkin", "■ active")).color(c.green)));
+                        } else if ui.add_sized([96.0, 22.0], egui::Button::new(t("Etkinleştir", "Activate"))).clicked() {
+                            self.send(Cmd::PowerPlan(p.guid.clone(), p.name.clone()));
+                        }
+                        ui.label(&p.name);
+                    });
                 }
             });
             ui.add_space(10.0);
         });
     }
+}
+
+/// "Etiket  deger" bicimli kucuk bilgi kutusu.
+fn chip(ui: &mut egui::Ui, label: &str, value: &str) {
+    egui::Frame::none()
+        .fill(ui.visuals().extreme_bg_color)
+        .rounding(6.0)
+        .inner_margin(egui::Margin::symmetric(8.0, 3.0))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(label).weak());
+                ui.label(RichText::new(value).strong());
+            });
+        });
+}
+
+/// Bes basamakli olcek: "Sessizlik ■■■■□".
+fn meter(ui: &mut egui::Ui, label: &str, value: usize, col: egui::Color32) {
+    ui.horizontal(|ui| {
+        let r = ui.label(RichText::new(label).weak());
+        ui.add_space((74.0 - r.rect.width()).max(0.0));
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(5.0 * 22.0, 10.0), egui::Sense::hover());
+        let off = ui.visuals().widgets.noninteractive.bg_stroke.color;
+        for i in 0..5 {
+            let r = egui::Rect::from_min_size(
+                egui::pos2(rect.left() + i as f32 * 22.0, rect.top()),
+                egui::vec2(18.0, 10.0),
+            );
+            ui.painter().rect_filled(r, 3.0, if i < value { col } else { off });
+        }
+    });
 }

@@ -7,7 +7,6 @@ use crate::sig::Risk;
 use crate::tr;
 use crate::{card, pal, primary, win, App};
 use eframe::egui::{self, RichText};
-use egui_extras::{Column, TableBuilder};
 use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
@@ -258,84 +257,68 @@ impl App {
         let mut scan_one: Option<Finding> = None;
         let held_h = if held.is_empty() { 0.0 } else { 34.0 + 24.0 * held.len().min(5) as f32 };
         let table_h = (ui.available_height() - held_h - 30.0).max(120.0);
-        ui.push_id("risk", |ui| {
-            TableBuilder::new(ui)
-                .striped(true)
-                .resizable(true)
-                .max_scroll_height(table_h)
-                .min_scrolled_height(table_h)
-                .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                .column(Column::initial(78.0))
-                .column(Column::initial(190.0).clip(true))
-                .column(Column::remainder().at_least(220.0).clip(true))
-                .column(Column::initial(140.0).clip(true))
-                .column(Column::initial(150.0).clip(true))
-                .column(Column::initial(300.0))
-                .column(Column::initial(230.0).clip(true))
-                .header(24.0, |mut h| {
-                    let heads = [
-                        t("Düzey", "Level"),
-                        t("Ad", "Name"),
-                        t("Neden işaretlendi", "Why it was flagged"),
-                        t("Nerede", "Where"),
-                        "Defender",
-                        t("İşlem", "Action"),
-                        t("Dosya / konum", "File / location"),
-                    ];
-                    for head in heads {
-                        h.col(|ui| {
-                            ui.label(RichText::new(head).strong());
-                        });
+        // Her bulgu kendi kutusunda: ad, neden, konum ve dugmeler alt alta durur; pencere daralinca
+        // metin alt satira gecer, hicbir sey sagda gorunmez kalmaz.
+        egui::ScrollArea::vertical()
+            .id_salt("risk")
+            .max_height(table_h)
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                let w = ui.available_width() - 16.0;
+                for (n, f) in list.iter().enumerate() {
+                    let col = if f.level == Risk::Suspicious { c.red } else { c.orange };
+                    let mut frame = egui::Frame::none()
+                        .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                        .rounding(6.0);
+                    if n % 2 == 0 {
+                        frame = frame.fill(ui.visuals().faint_bg_color);
                     }
-                })
-                .body(|body| {
-                    body.rows(26.0, list.len(), |mut row| {
-                        let f = &list[row.index()];
-                        let col = if f.level == Risk::Suspicious { c.red } else { c.orange };
-                        row.col(|ui| {
+                    frame.show(ui, |ui| {
+                        ui.set_width(w - 20.0);
+                        ui.horizontal_wrapped(|ui| {
                             ui.colored_label(col, if f.level == Risk::Suspicious { t("■ Şüpheli", "■ Suspicious") } else { t("■ İncele", "■ Review") });
-                        });
-                        row.col(|ui| {
-                            ui.label(RichText::new(&f.name).color(col).strong());
-                        });
-                        row.col(|ui| {
-                            ui.label(&f.reason).on_hover_text(&f.reason);
-                        });
-                        row.col(|ui| {
+                            ui.label(RichText::new(&f.name).color(col).strong().size(15.0));
                             ui.label(RichText::new(f.kinds()).weak());
-                        });
-                        row.col(|ui| match &f.verdict {
-                            Some((true, v)) => {
-                                ui.colored_label(c.red, RichText::new(tr!("TEHDİT · {}", "THREAT · {}", v)).strong())
-                                    .on_hover_text(v);
-                            }
-                            Some((false, v)) => {
-                                ui.colored_label(c.green, v);
-                            }
-                            None => {
-                                if f.has_file() && ui.add_enabled(!busy, egui::Button::new(t("Tara", "Scan")).small()).clicked() {
-                                    scan_one = Some(f.clone());
+                            match &f.verdict {
+                                Some((true, v)) => {
+                                    ui.colored_label(c.red, RichText::new(tr!("Defender: TEHDİT · {}", "Defender: THREAT · {}", v)).strong());
                                 }
+                                Some((false, v)) => {
+                                    ui.colored_label(c.green, format!("Defender: {v}"));
+                                }
+                                None => {}
                             }
                         });
-                        row.col(|ui| {
+                        ui.add(egui::Label::new(&f.reason).wrap());
+                        if !f.path.is_empty() {
+                            ui.add(egui::Label::new(RichText::new(&f.path).weak()).wrap());
+                        }
+                        ui.add_space(2.0);
+                        ui.horizontal_wrapped(|ui| {
                             if let Some((tool, params)) = f.setting() {
-                                if ui.small_button(t("Ayarı aç", "Open setting")).clicked() {
+                                if ui.button(t("Ayarı aç", "Open setting")).clicked() {
                                     win::shell_open(tool, params);
                                 }
                             } else if confirm.as_ref().map(|x| &x.0) == Some(&f.key) {
                                 let del = confirm.as_ref().is_some_and(|x| x.1);
-                                ui.colored_label(c.red, if del { t("Geri alınamaz!", "Cannot be undone!") } else { t("Emin misiniz?", "Are you sure?") });
-                                if ui.small_button(RichText::new(t("Evet", "Yes")).color(c.red)).clicked() {
+                                ui.colored_label(
+                                    c.red,
+                                    if del {
+                                        t("Dosya kalıcı olarak silinecek, geri alınamaz. Emin misiniz?", "The file will be deleted permanently and cannot be recovered. Are you sure?")
+                                    } else {
+                                        t("Karantinaya alınsın mı?", "Move to quarantine?")
+                                    },
+                                );
+                                if ui.button(RichText::new(t("Evet", "Yes")).color(c.red)).clicked() {
                                     act = Some((f.clone(), del));
                                     ask = Some(None);
                                 }
-                                if ui.small_button(t("Vazgeç", "Cancel")).clicked() {
+                                if ui.button(t("Vazgeç", "Cancel")).clicked() {
                                     ask = Some(None);
                                 }
                             } else {
                                 if ui
-                                    .add_enabled(!busy, egui::Button::new(t("Karantina", "Quarantine")).small())
+                                    .add_enabled(!busy, egui::Button::new(t("Karantinaya al", "Quarantine")))
                                     .on_hover_text(t(
                                         "Süreci sonlandırır, başlangıç / servis / görev kaydını kapatır, dosyayı karantina klasörüne taşır. Geri alınabilir.",
                                         "Ends the process, turns off its startup / service / task entry and moves the file to the quarantine folder. Can be undone.",
@@ -345,7 +328,7 @@ impl App {
                                     ask = Some(Some((f.key.clone(), false)));
                                 }
                                 if ui
-                                    .add_enabled(!busy, egui::Button::new(RichText::new(t("Kalıcı sil", "Delete")).color(c.red)).small())
+                                    .add_enabled(!busy, egui::Button::new(RichText::new(t("Kalıcı sil", "Delete permanently")).color(c.red)))
                                     .on_hover_text(t(
                                         "Süreci sonlandırır, kayıtlarını siler ve dosyayı kalıcı olarak siler. Geri alınamaz.",
                                         "Ends the process, deletes its entries and deletes the file permanently. Cannot be undone.",
@@ -355,23 +338,29 @@ impl App {
                                     ask = Some(Some((f.key.clone(), true)));
                                 }
                                 if ui
-                                    .small_button(t("Güvenilir", "Trust"))
-                                    .on_hover_text(t("Bu öğeyi tanıyorum; bir daha listeleme", "Mark as trusted: I know this item; don't list it again"))
+                                    .button(t("Güvenilir say", "Mark as trusted"))
+                                    .on_hover_text(t("Bu öğeyi tanıyorum; bir daha listeleme", "I know this item; don't list it again"))
                                     .clicked()
                                 {
                                     trust = Some(f.key.clone());
                                 }
                             }
-                            if f.path.contains('\\') && Path::new(&f.path).exists() && ui.small_button(t("Konum", "Location")).clicked() {
+                            if f.verdict.is_none()
+                                && f.has_file()
+                                && ui
+                                    .add_enabled(!busy, egui::Button::new(t("Defender ile tara", "Scan with Defender")))
+                                    .clicked()
+                            {
+                                scan_one = Some(f.clone());
+                            }
+                            if f.path.contains('\\') && Path::new(&f.path).exists() && ui.button(t("Konumu aç", "Open location")).clicked() {
                                 win::open_location(&f.path);
                             }
                         });
-                        row.col(|ui| {
-                            ui.label(RichText::new(&f.path).weak()).on_hover_text(&f.path);
-                        });
                     });
-                });
-        });
+                    ui.add_space(2.0);
+                }
+            });
         if scanned && list.is_empty() && !busy {
             ui.colored_label(c.green, t("✔ İşaretlenen bir öğe yok.", "✔ No flagged items."));
         }

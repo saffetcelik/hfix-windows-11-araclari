@@ -138,6 +138,7 @@ pub enum Cmd {
     Auto(AutoCfg),
     Rules(Vec<String>),
     Note(String),
+    #[allow(dead_code)]
     RefreshPower,
 }
 
