@@ -80,6 +80,8 @@ fn own_dir() -> Option<PathBuf> {
     crate::cfg::dir()
 }
 
+use crate::install::is_self;
+
 /// Windows dosyalarina ve bu programin kendi klasorune asla dokunulmaz.
 fn removable(p: &str) -> bool {
     if p.is_empty() || in_windows(p) || !Path::new(p).is_file() {
@@ -412,6 +414,10 @@ pub fn scan(procs: Vec<(String, String, Risk, String)>, progress: &dyn Fn(&str))
     settings(&mut out);
     let trusted = trusted();
     out.retain(|f| !trusted.contains(&f.key));
+    // Program kendini (ve kendi baslangic gorevini) listelemez.
+    out.retain(|f| {
+        !is_self(&f.path) && !f.origins.iter().any(|o| matches!(o, Origin::Task(task) if is_self(&task.exe)))
+    });
     out.sort_by(|a, b| {
         b.level
             .cmp(&a.level)

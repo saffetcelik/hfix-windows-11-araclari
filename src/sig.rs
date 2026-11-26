@@ -46,6 +46,9 @@ pub fn assess(name: &str, exe: &str, sig: Option<&Sig>) -> (Risk, String) {
     if exe.is_empty() {
         return (Risk::Unknown, String::new());
     }
+    if crate::install::is_self(exe) {
+        return (Risk::Ok, t("Bu program", "This program").into());
+    }
     let Some(sig) = sig else {
         return (Risk::Unknown, t("denetleniyor…", "checking…").into());
     };

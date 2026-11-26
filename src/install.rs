@@ -341,3 +341,46 @@ pub fn uninstall(quiet: bool) {
         );
     }
 }
+
+// ------------------------------------------------- programin kendini tanimasi
+
+/// Bu programin kendisi mi? Kendi klasorundeki ya da kurulum klasorundeki dosyalar ve baska bir
+/// yerde duran birebir ayni kopyasi (ornegin indirilen exe) imzasiz / supheli sayilmaz. Yalnizca
+/// ada bakilmaz: ayni adi tasiyan baska bir dosya bu yolla gizlenemez.
+pub fn is_self(p: &str) -> bool {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+    let p = p.trim().trim_matches('"');
+    if p.is_empty() {
+        return false;
+    }
+    let low = p.to_lowercase();
+    let inside = |d: Option<PathBuf>| {
+        d.is_some_and(|d| {
+            let d = d.to_string_lossy().to_lowercase();
+            !d.is_empty() && low.starts_with(&format!("{}\\", d.trim_end_matches('\\')))
+        })
+    };
+    if inside(crate::cfg::dir()) || inside(install_dir()) {
+        return true;
+    }
+    // Icerik karsilastirmasi pahalidir; sonuc dosya basina (boyut ve degisme zamaniyla) saklanir.
+    static CACHE: Mutex<Option<HashMap<String, (u64, Option<std::time::SystemTime>, bool)>>> = Mutex::new(None);
+    let (Ok(me), Ok(meta)) = (std::env::current_exe(), std::fs::metadata(p)) else {
+        return false;
+    };
+    if std::fs::metadata(&me).map(|m| m.len()).ok() != Some(meta.len()) {
+        return false;
+    }
+    let stamp = (meta.len(), meta.modified().ok());
+    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    let map = cache.get_or_insert_with(HashMap::new);
+    if let Some((len, time, same)) = map.get(&low) {
+        if (*len, *time) == stamp {
+            return *same;
+        }
+    }
+    let same = same_content(&me, Path::new(p));
+    map.insert(low, (stamp.0, stamp.1, same));
+    same
+}
