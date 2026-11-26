@@ -64,6 +64,8 @@ pub struct State {
     startup: Arc<Mutex<StartupState>>,
     startup_filter: String,
     startup_sort: (usize, bool),
+    /// Secili baslangic ogesi (ad|komut).
+    startup_sel: Option<String>,
     view_tasks: bool,
     show_manual: bool,
     disk: Arc<Mutex<DiskState>>,
@@ -81,6 +83,7 @@ impl State {
             startup: Arc::default(),
             startup_filter: String::new(),
             startup_sort: (4, true),
+            startup_sel: None,
             view_tasks: std::env::var("FB_TASKS").is_ok(),
             show_manual: false,
             disk: Arc::default(),
@@ -271,8 +274,44 @@ impl App {
 
         let mut toggle: Option<(usize, bool)> = None;
         let weak_col = ui.visuals().weak_text_color();
+        let key_of = |it: &Item| format!("{}|{}", it.name, it.command);
+        // Secili oge: ayrinti seridi (tam komut, konum ve ac / kapat dugmeleri).
+        let sel_key = self.ui.startup_sel.clone();
+        let mut clicked_key: Option<String> = None;
+        if let Some((i, it)) = sel_key.as_ref().and_then(|k| items.iter().enumerate().find(|(_, it)| &key_of(it) == k)) {
+            crate::card(ui).show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new(&it.name).strong());
+                    ui.label(RichText::new(&it.publisher).weak());
+                    if !it.exe.is_empty() && ui.button(t("Konumu aç", "Open location")).clicked() {
+                        win::open_location(&it.exe);
+                    }
+                    if ui
+                        .button(if it.enabled { t("Başlangıçtan kapat", "Turn off at startup") } else { t("Başlangıçta aç", "Turn on at startup") })
+                        .clicked()
+                    {
+                        toggle = Some((i, !it.enabled));
+                    }
+                    if ui.button(t("Seçimi kaldır", "Clear selection")).clicked() {
+                        clicked_key = Some(key_of(it));
+                    }
+                });
+                ui.add(egui::Label::new(RichText::new(&it.command).weak()).wrap());
+            });
+            ui.add_space(4.0);
+        } else {
+            ui.label(
+                RichText::new(t(
+                    "Bir satıra tıklayınca ayrıntıları ve \"Konumu aç\" düğmesi görünür; çift tıklama konumu doğrudan açar.",
+                    "Click a row to see its details and the \"Open location\" button; a double-click opens the location directly.",
+                ))
+                .weak(),
+            );
+        }
         TableBuilder::new(ui)
             .striped(true)
+            .sense(egui::Sense::click())
             .resizable(true)
             .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
             .column(Column::initial(46.0))
@@ -335,6 +374,7 @@ impl App {
                     };
                     let it = &items[i];
                     let rc = risk_color(c, it.risk);
+                    row.set_selected(sel_key.as_ref() == Some(&key_of(it)));
                     row.col(|ui| {
                         let mut en = it.enabled;
                         if ui.checkbox(&mut en, "").changed() {
@@ -384,8 +424,19 @@ impl App {
                         ui.label(RichText::new(&it.command).weak())
                             .on_hover_text(&it.command);
                     });
+                    let resp = row.response();
+                    if resp.double_clicked() {
+                        if !it.exe.is_empty() {
+                            win::open_location(&it.exe);
+                        }
+                    } else if resp.clicked() {
+                        clicked_key = Some(key_of(it));
+                    }
                 });
             });
+        if let Some(k) = clicked_key {
+            self.ui.startup_sel = if self.ui.startup_sel.as_ref() == Some(&k) { None } else { Some(k) };
+        }
 
         // Acik ve Durum ayni olcute gore siralar.
         if sort.0 == 0 {

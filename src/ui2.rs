@@ -518,6 +518,9 @@ impl App {
             Svc(usize),
         }
         let f = self.ui2.svc_filter.to_lowercase();
+        // Grup ici siralama: 0 calisanlar ustte (varsayilan), 1 duranlar ustte, 2 ada gore.
+        let sort_id = egui::Id::new("svc_sort");
+        let svc_sort: u8 = ui.ctx().data(|d| d.get_temp(sort_id)).unwrap_or(0);
         let mut lines: Vec<Line> = Vec::new();
         for g in Group::ALL {
             if g == Group::Core && !self.ui2.svc_core && !self.ui2.svc_risky && f.is_empty() {
@@ -540,6 +543,16 @@ impl App {
             if idx.is_empty() {
                 continue;
             }
+            let mut idx = idx;
+            idx.sort_by(|a, b| {
+                let (x, y) = (&list[*a], &list[*b]);
+                let o = match svc_sort {
+                    0 => y.running.cmp(&x.running),
+                    1 => x.running.cmp(&y.running),
+                    _ => std::cmp::Ordering::Equal,
+                };
+                o.then_with(|| x.display.to_lowercase().cmp(&y.display.to_lowercase()))
+            });
             let run = idx.iter().filter(|i| list[**i].running).count();
             lines.push(Line::Head(g, idx.len(), run));
             lines.extend(idx.into_iter().map(Line::Svc));
@@ -560,7 +573,7 @@ impl App {
             .column(Column::initial(170.0).clip(true))
             .column(Column::remainder().clip(true))
             .header(24.0, |mut h| {
-                for t in [
+                for (i, t) in [
                     "",
                     tr!("Servis", "Service"),
                     tr!("Durum", "Status"),
@@ -568,9 +581,34 @@ impl App {
                     tr!("Bellek", "Memory"),
                     tr!("İmza / yayıncı", "Signature / publisher"),
                     tr!("Ne işe yarar", "What it does"),
-                ] {
+                ]
+                .into_iter()
+                .enumerate()
+                {
                     h.col(|ui| {
-                        ui.label(RichText::new(t).strong());
+                        // Servis ve Durum basliklari grup ici siralamayi degistirir.
+                        let arrow = match (i, svc_sort) {
+                            (1, 2) => " ⬆",
+                            (2, 0) => " ⬇",
+                            (2, 1) => " ⬆",
+                            _ => "",
+                        };
+                        if i == 1 || i == 2 {
+                            if ui
+                                .add(egui::Button::new(RichText::new(format!("{t}{arrow}")).strong()).frame(false))
+                                .on_hover_text(tr!("Sıralamak için tıklayın", "Click to sort"))
+                                .clicked()
+                            {
+                                let next: u8 = match (i, svc_sort) {
+                                    (1, _) => 2,
+                                    (_, 0) => 1,
+                                    _ => 0,
+                                };
+                                ui.ctx().data_mut(|d| d.insert_temp(sort_id, next));
+                            }
+                        } else {
+                            ui.label(RichText::new(t).strong());
+                        }
                     });
                 }
             })

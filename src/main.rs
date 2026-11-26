@@ -173,8 +173,10 @@ fn main() {
         "HFixWin11",
         opts,
         Box::new(move |cc| {
+            // Acik ve koyu temanin ayri stilleri vardir; yalnizca etkin olana yazilirsa tema
+            // degisince metinler secilebilir olur ve yazinin ustune tiklamak satiri secmez.
             cc.egui_ctx
-                .style_mut(|s| s.interaction.selectable_labels = false);
+                .all_styles_mut(|s| s.interaction.selectable_labels = false);
             let ctx = cc.egui_ctx.clone();
             let (auto, rules) = (config.auto, config.rules.clone());
             std::thread::spawn(move || worker(sh, rx, ctx, admin, auto, rules));

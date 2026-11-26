@@ -24,7 +24,7 @@ Windows 11 için **ücretsiz ve açık kaynak** bakım, hızlandırma ve güvenl
 | **İzleme** | Süreçler | İşlemci, bellek, disk ve ağ kullanımı; programı kısma, hızlandırma, sonlandırma; imzasız ve şüpheli programların renkle gösterimi |
 | | Ağ | İnterneti kullanan programlar, indirme / yükleme hızları ve bağlantı sayıları |
 | | Bellek | RAM temizliği ve önce / sonra karşılaştırması |
-| **Hızlandırma** | Windows Hızlandırma | 44 Windows ayarı beş grupta: gizlilik ve telemetri, reklam / öneri / yapay zekâ (Copilot, Recall, Widgets), performans, görünüm, Microsoft Edge. Her ayar tek tıkla uygulanır ve geri alınır. Gereksiz Store uygulamalarını kaldırma |
+| **Hızlandırma** | Windows Hızlandırma | 70 Windows ayarı beş grupta: gizlilik ve telemetri, reklam / öneri / yapay zekâ (Copilot, Recall, Widgets), performans, görünüm, Microsoft Edge. Her ayar tek tıkla uygulanır ve geri alınır. Gereksiz Store uygulamalarını kaldırma |
 | | Güç Modu | Sessiz, Akıllı, Performans ve En yüksek işlemci modları; fanı susturan otomatik kısma |
 | | Başlangıç ve Görevler | Windows ile açılan programlar ve zamanlanmış görevler; güvensiz görünenlerin işaretlenmesi |
 | | Servisler | Gruplanmış arka plan servisleri, toplu durdurma ve geri yükleme, imzasız servis dosyaları |
@@ -41,7 +41,7 @@ Ayrıca:
 - **Sistem tepsisi.** Pencereyi kapatmak programı kapatmaz; tepside çalışmaya devam eder.
 - **Türkçe ve İngilizce** arayüz; Windows Türkçe ise Türkçe, değilse İngilizce açılır. Açık / koyu tema Windows ayarını izler. İkisi de **Ayarlar** sayfasından değiştirilebilir.
 
-Hızlandırma ayarları [Win11Debloat](https://github.com/Raphire/Win11Debloat), [AtlasOS](https://github.com/Atlas-OS/Atlas) ve [WinUtil](https://github.com/ChrisTitusTech/winutil) projelerinin ayar kataloglarından derlenmiştir; onarım komutları ve DNS listesi WinUtil ile [Optimizer](https://github.com/hellzerg/optimizer) ile aynıdır.
+Hızlandırma ayarları [Win11Debloat](https://github.com/Raphire/Win11Debloat), [AtlasOS](https://github.com/Atlas-OS/Atlas), [ReviOS](https://github.com/meetrevision/playbook) ve [WinUtil](https://github.com/ChrisTitusTech/winutil) projelerinin ayar kataloglarından derlenmiştir; onarım komutları ve DNS listesi WinUtil ile [Optimizer](https://github.com/hellzerg/optimizer) ile aynıdır.
 
 ## Otomatik güncelleme
 
@@ -97,7 +97,7 @@ programı derler, test eder, imzalar, imzayı programdaki açık anahtarla doğr
 **HFix Windows 11 Tools** is a free, open-source maintenance, speed-up and security utility for Windows 11, written in Rust. It is a single `.exe` with no ads, trial period or account.
 
 - **Monitor** — processes with CPU, memory, disk and per-process network use; throttle, boost or end a program; unsigned and suspicious programs are highlighted. RAM cleaner with a before / after comparison.
-- **Speed up** — 44 Windows tweaks in five groups (privacy and telemetry; ads, suggestions and AI such as Copilot, Recall and Widgets; performance; appearance; Microsoft Edge), each applied and undone with one click. Remove bloatware Store apps. CPU power modes, startup programs, scheduled tasks and Windows services.
+- **Speed up** — 70 Windows tweaks in five groups (privacy and telemetry; ads, suggestions and AI such as Copilot, Recall and Widgets; performance; appearance; Microsoft Edge), each applied and undone with one click. Remove bloatware Store apps. CPU power modes, startup programs, scheduled tasks and Windows services.
 - **Clean up** — temporary files, caches and update leftovers; uninstall programs.
 - **Security** — a risk scan over running processes, startup entries, services, tasks, temp folders and critical Windows settings, with quarantine, permanent deletion and a Microsoft Defender scan.
 
