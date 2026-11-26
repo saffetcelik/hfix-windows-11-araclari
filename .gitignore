@@ -1,0 +1,16 @@
+# derleme çıktısı
+/target/
+/release/
+
+# sürüm imzalama anahtarının gizli yarısı — asla depoya girmez
+imza-anahtari*
+*.key
+
+# programın çalışırken ürettiği dosyalar
+ayarlar.txt
+ayar-yedek.txt
+servis-yedek.txt
+guvenilir.txt
+karantina/
+guncelleme/
+*.old

@@ -1,0 +1,114 @@
+# Her gönderimde programı derler ve testleri çalıştırır. main dalına gönderilen Cargo.toml'daki
+# sürüm numarası için henüz bir GitHub sürümü yoksa: exe'yi imzalar ve "v<sürüm>" etiketiyle
+# yayımlar. Yani yeni sürüm çıkarmak için Cargo.toml'da `version` satırını artırıp göndermek yeter;
+# kurulu programlar yeni sürümü kendiliğinden indirir.
+#
+# İmza anahtarı depoda durmaz; HFIX_IMZA_ANAHTARI adlı depo sırrından (Settings → Secrets and
+# variables → Actions) okunur.
+name: Derle ve yayımla
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: surum-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  derle:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust (x86_64-pc-windows-gnu)
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal --no-self-update
+          rustup default stable-x86_64-pc-windows-gnu
+          rustc --version
+
+      - name: Derleme önbelleği
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-gnu-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-gnu-
+
+      - name: Testler
+        run: cargo test --release --locked
+
+      - name: Derle
+        run: cargo build --release --locked
+
+      - name: Sürüm numarası
+        id: surum
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          gh release view "v$v" --repo $env:GITHUB_REPOSITORY *> $null
+          $yeni = ($LASTEXITCODE -ne 0) -and ($env:GITHUB_EVENT_NAME -ne 'pull_request') -and ($env:GITHUB_REF -eq 'refs/heads/main')
+          "surum=$v" >> $env:GITHUB_OUTPUT
+          "yayimla=$($yeni.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          Write-Host "Sürüm $v — yayımlanacak mı: $yeni"
+          exit 0
+
+      - name: İmzala
+        if: steps.surum.outputs.yayimla == 'true'
+        env:
+          HFIX_IMZA_ANAHTARI: ${{ secrets.HFIX_IMZA_ANAHTARI }}
+        run: |
+          if (-not $env:HFIX_IMZA_ANAHTARI) { throw 'HFIX_IMZA_ANAHTARI sırrı tanımlı değil.' }
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item target\release\HFixWin11.exe release\HFixWin11.exe
+          $exe = (Resolve-Path release\HFixWin11.exe).Path
+          $sig = "$exe.sig"
+          $key = Join-Path $env:RUNNER_TEMP 'imza-anahtari.txt'
+          [IO.File]::WriteAllText($key, $env:HFIX_IMZA_ANAHTARI.Trim())
+          try {
+            # Program pencere alt sistemiyle derlendiği için çıkış kodu Start-Process ile alınır.
+            $p = Start-Process $exe -ArgumentList '--imzala', $key, $exe, $sig -Wait -PassThru
+          } finally {
+            Remove-Item $key -Force
+          }
+          if ($p.ExitCode -eq 2) { throw 'Sırdaki anahtar programa gömülü açık anahtarla eşleşmiyor.' }
+          if ($p.ExitCode -ne 0) { throw "İmzalama başarısız (kod $($p.ExitCode))." }
+          $p = Start-Process $exe -ArgumentList '--imza-dogrula', $exe, $sig -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw 'İmza programdaki açık anahtarla doğrulanamadı.' }
+          Get-Content $sig
+
+      - name: Yayımla
+        if: steps.surum.outputs.yayimla == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SURUM: ${{ steps.surum.outputs.surum }}
+        run: |
+          $not = @"
+          **Kurulum:** ``HFixWin11.exe`` dosyasını indirip çalıştırın. Program kendini kurar, masaüstüne ve Başlat menüsüne kısayol koyar. Kurulu sürümler bu sürüme kendiliğinden güncellenir.
+
+          **Install:** download and run ``HFixWin11.exe``. It installs itself and puts a shortcut on the desktop and in the Start menu. Installed copies update to this release automatically.
+
+          Program henüz kod imzalı olmadığı için Windows SmartScreen ilk açılışta "Ek bilgi → Yine de çalıştır" sorabilir. / The program is not code-signed yet, so Windows SmartScreen may ask "More info → Run anyway" on first start.
+          "@
+          gh release create "v$env:SURUM" release\HFixWin11.exe release\HFixWin11.exe.sig `
+            --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA `
+            --title "HFix Windows 11 Araçları $env:SURUM" --notes $not --generate-notes
+
+      - name: Derlenen dosya
+        if: steps.surum.outputs.yayimla != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: HFixWin11
+          path: target/release/HFixWin11.exe
+          retention-days: 14
