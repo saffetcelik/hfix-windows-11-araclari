@@ -21,6 +21,7 @@ mod tasks;
 mod ui;
 mod ui2;
 mod ui5;
+mod ui6;
 mod update;
 mod win;
 
@@ -146,16 +147,25 @@ fn main() {
     let shared = Arc::new(Mutex::new(Snapshot::default()));
     let (tx, rx) = mpsc::channel::<Cmd>();
 
+    // Pencere ekrana sigacak boyutta ve ekranin ortasinda acilir.
+    let (mut size, mut pos) = ([1240.0_f32, 780.0_f32], None);
+    if let Some([l, t, r, b]) = win::work_area() {
+        let (w, h) = ((r - l) as f32, (b - t) as f32);
+        size = [size[0].min(w - 32.0).max(640.0), size[1].min(h - 56.0).max(420.0)];
+        pos = Some([l as f32 + (w - size[0]) / 2.0 - 8.0, (t as f32 + (h - size[1] - 40.0) / 2.0).max(t as f32)]);
+    }
+    let mut viewport = egui::ViewportBuilder::default().with_inner_size(size).with_min_inner_size([760.0, 460.0]);
+    if let Some(p) = pos {
+        viewport = viewport.with_position(p);
+    }
     let opts = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
+        viewport: viewport
             .with_title(tray::window_title())
             .with_icon(egui::IconData {
                 rgba: icon::rgba(64),
                 width: 64,
                 height: 64,
-            })
-            .with_inner_size([1240.0, 780.0])
-            .with_min_inner_size([900.0, 520.0]),
+            }),
         ..Default::default()
     };
     let sh = shared.clone();
@@ -369,11 +379,12 @@ pub enum Tab {
     Boost,
     Settings,
     About,
+    Repair,
 }
 
 impl Tab {
     /// `--tab N` test secenegi bu siraya gore sayar.
-    const ALL: [Tab; 13] = [
+    const ALL: [Tab; 14] = [
         Tab::Procs,
         Tab::Net,
         Tab::Mem,
@@ -387,13 +398,14 @@ impl Tab {
         Tab::Boost,
         Tab::Settings,
         Tab::About,
+        Tab::Repair,
     ];
 
     /// Yan menu: (bolum basligi TR, EN, sekmeler).
     const NAV: [(&'static str, &'static str, &'static [Tab]); 5] = [
         ("İZLEME", "MONITOR", &[Tab::Procs, Tab::Net, Tab::Mem]),
         ("HIZLANDIRMA", "SPEED UP", &[Tab::Boost, Tab::Power, Tab::Startup, Tab::Services]),
-        ("TEMİZLİK", "CLEAN UP", &[Tab::Disk, Tab::Programs]),
+        ("BAKIM", "MAINTENANCE", &[Tab::Disk, Tab::Programs, Tab::Repair]),
         ("GÜVENLİK", "SECURITY", &[Tab::Risk, Tab::Log]),
         ("PROGRAM", "PROGRAM", &[Tab::Settings, Tab::About]),
     ];
@@ -413,6 +425,7 @@ impl Tab {
             Tab::Boost => lang::t("Windows Hızlandırma", "Windows Speed-Up"),
             Tab::Settings => lang::t("Ayarlar", "Settings"),
             Tab::About => lang::t("Hakkında", "About"),
+            Tab::Repair => lang::t("Onarım ve Ağ", "Repair and Network"),
         }
     }
 
@@ -449,6 +462,10 @@ impl Tab {
             Tab::Log => lang::t("Programın yaptığı işlemlerin kaydı", "A record of what the program did"),
             Tab::Settings => lang::t("Tema, dil, başlangıç ve güncelleme tercihleri", "Theme, language, startup and update preferences"),
             Tab::About => lang::t("Sürüm bilgisi ve güncelleme", "Version information and updates"),
+            Tab::Repair => lang::t(
+                "Sistem dosyası onarımı, DNS seçimi ve ağ düzeltmeleri",
+                "System file repair, DNS selection and network fixes",
+            ),
         }
     }
 }
@@ -503,6 +520,7 @@ struct App {
     ui3: ui3::State,
     ui4: ui4::State,
     ui5: ui5::State,
+    ui6: ui6::State,
     frames: u32,
     shot: Option<String>,
     shot_clean: bool,
@@ -535,6 +553,7 @@ impl App {
             ui3: ui3::State::default(),
             ui4: ui4::State::default(),
             ui5: ui5::State::default(),
+            ui6: ui6::State::default(),
             frames: 0,
             shot: None,
             shot_clean: false,
@@ -757,13 +776,20 @@ impl App {
     fn nav(&mut self, ui: &mut egui::Ui, s: &Snapshot) {
         let c = pal(ui);
         ui.spacing_mut().button_padding = egui::vec2(10.0, 7.0);
+        // Pencere kisaldiginda menu sikisir; yine sigmazsa kaydirilir.
+        let short = ui.available_height() < 800.0;
+        if short {
+            ui.spacing_mut().button_padding = egui::vec2(10.0, 4.0);
+            ui.spacing_mut().item_spacing.y = 2.0;
+        }
+        egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         ui.with_layout(egui::Layout::top_down_justified(egui::Align::Min), |ui| {
-            ui.add_space(10.0);
+            ui.add_space(if short { 4.0 } else { 10.0 });
             ui.label(RichText::new("HFix").size(22.0).strong());
             ui.label(RichText::new(lang::t("Windows 11 Araçları", "Windows 11 Tools")).weak());
             let update_ready = update::info().phase == update::Phase::Ready;
             for (section_tr, section_en, tabs) in Tab::NAV {
-                ui.add_space(10.0);
+                ui.add_space(if short { 5.0 } else { 10.0 });
                 ui.label(RichText::new(lang::t(section_tr, section_en)).small().weak());
                 ui.add_space(2.0);
                 for t in tabs {
@@ -780,9 +806,43 @@ impl App {
                     }
                 }
             }
-            ui.add_space(16.0);
+            ui.add_space(if short { 6.0 } else { 16.0 });
             ui.separator();
             ui.add_space(6.0);
+            // Guncelleme durumu: inerken donen halka, hazir olunca yeniden baslatma dugmesi.
+            let up = update::info();
+            match up.phase {
+                update::Phase::Downloading => {
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        ui.label(tr!("Sürüm {} indiriliyor…", "Downloading {}…", up.version));
+                    });
+                    ui.add_space(6.0);
+                }
+                update::Phase::Ready => {
+                    ui.colored_label(c.green, tr!("Yeni sürüm hazır: {}", "New version ready: {}", up.version));
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new(lang::t("Yeniden başlat ve güncelle", "Restart and update"))
+                                    .strong()
+                                    .color(Color32::WHITE),
+                            )
+                            .fill(Color32::from_rgb(24, 140, 70))
+                            .min_size(egui::vec2(0.0, 32.0)),
+                        )
+                        .on_hover_text(lang::t(
+                            "Programı kapatır, yeni sürümü kurar ve yeniden açar.",
+                            "Closes the program, installs the new version and opens it again.",
+                        ))
+                        .clicked()
+                    {
+                        update::apply_and_restart();
+                    }
+                    ui.add_space(6.0);
+                }
+                _ => {}
+            }
             if ui
                 .add(primary(lang::t("RAM'i temizle", "Clean RAM")))
                 .on_hover_text(lang::t(
@@ -805,6 +865,8 @@ impl App {
             {
                 tray::quit();
             }
+            ui.add_space(6.0);
+        });
         });
     }
 
@@ -931,27 +993,27 @@ impl App {
         let count = if group { lang::t("Adet", "Count") } else { "PID" };
         let cols: Vec<(&str, SortCol, f32)> = if net {
             vec![
-                (lang::t("Süreç", "Process"), SortCol::Name, 230.0),
-                (count, SortCol::Count, 60.0),
-                (lang::t("İmza / yayıncı", "Signature / publisher"), SortCol::Trust, 220.0),
-                (lang::t("İndirme", "Download"), SortCol::Down, 100.0),
-                (lang::t("Yükleme", "Upload"), SortCol::Up, 100.0),
-                (lang::t("Bağlantı", "Connections"), SortCol::Conns, 80.0),
-                ("CPU %", SortCol::Cpu, 70.0),
-                (lang::t("Bellek", "Memory"), SortCol::Mem, 90.0),
+                (lang::t("Süreç", "Process"), SortCol::Name, 0.0),
+                (count, SortCol::Count, 52.0),
+                (lang::t("İmza / yayıncı", "Signature / publisher"), SortCol::Trust, 0.0),
+                (lang::t("İndirme", "Download"), SortCol::Down, 84.0),
+                (lang::t("Yükleme", "Upload"), SortCol::Up, 84.0),
+                (lang::t("Bağl.", "Conn."), SortCol::Conns, 58.0),
+                ("CPU %", SortCol::Cpu, 64.0),
+                (lang::t("Bellek", "Memory"), SortCol::Mem, 78.0),
             ]
         } else {
             vec![
-                (lang::t("Süreç", "Process"), SortCol::Name, 230.0),
-                (count, SortCol::Count, 60.0),
-                (lang::t("İmza / yayıncı", "Signature / publisher"), SortCol::Trust, 220.0),
-                ("CPU %", SortCol::Cpu, 70.0),
-                (lang::t("1 dk ort.", "1 min avg"), SortCol::Avg, 80.0),
-                (lang::t("Bellek", "Memory"), SortCol::Mem, 90.0),
-                ("Disk", SortCol::Disk, 90.0),
-                (lang::t("İndirme", "Download"), SortCol::Down, 90.0),
-                (lang::t("Yükleme", "Upload"), SortCol::Up, 90.0),
-                (lang::t("Bağlantı", "Connections"), SortCol::Conns, 70.0),
+                (lang::t("Süreç", "Process"), SortCol::Name, 0.0),
+                (count, SortCol::Count, 52.0),
+                (lang::t("İmza / yayıncı", "Signature / publisher"), SortCol::Trust, 0.0),
+                ("CPU %", SortCol::Cpu, 64.0),
+                (lang::t("1 dk", "1 min"), SortCol::Avg, 58.0),
+                (lang::t("Bellek", "Memory"), SortCol::Mem, 78.0),
+                ("Disk", SortCol::Disk, 78.0),
+                (lang::t("İndirme", "Download"), SortCol::Down, 84.0),
+                (lang::t("Yükleme", "Upload"), SortCol::Up, 84.0),
+                (lang::t("Bağl.", "Conn."), SortCol::Conns, 58.0),
             ]
         };
 
@@ -960,11 +1022,12 @@ impl App {
             .resizable(true)
             .sense(egui::Sense::click())
             .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
-        for (i, (_, _, w)) in cols.iter().enumerate() {
-            tb = tb.column(if i + 1 == cols.len() {
-                Column::remainder()
+        // Genisligi 0 olan (metin) sutunlar kalan yeri paylasir; sayi sutunlari icerigi kadar dardir.
+        for (_, _, w) in cols.iter() {
+            tb = tb.column(if *w == 0.0 {
+                Column::remainder().at_least(110.0).clip(true)
             } else {
-                Column::initial(*w).at_least(40.0).clip(true)
+                Column::exact(*w)
             });
         }
 
@@ -1159,6 +1222,7 @@ impl eframe::App for App {
             Tab::Power => self.power_tab(ui, &s),
             Tab::Settings => self.settings_tab(ui),
             Tab::About => self.about_tab(ui),
+            Tab::Repair => self.repair_tab(ui, &s),
             Tab::Log => {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     for l in &s.log {

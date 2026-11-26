@@ -888,3 +888,15 @@ pub fn wait_pid(pid: u32, ms: u32) {
         }
     }
 }
+#[link(name = "user32")]
+extern "system" {
+    fn SystemParametersInfoW(action: u32, param: u32, data: *mut c_void, flags: u32) -> i32;
+}
+
+/// Gorev cubugu disinda kalan ekran alani: [sol, ust, sag, alt].
+pub fn work_area() -> Option<[i32; 4]> {
+    let mut r = [0i32; 4];
+    // 0x30: SPI_GETWORKAREA
+    let ok = unsafe { SystemParametersInfoW(0x30, 0, r.as_mut_ptr() as *mut c_void, 0) } != 0;
+    (ok && r[2] > r[0] && r[3] > r[1]).then_some(r)
+}
