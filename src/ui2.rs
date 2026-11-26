@@ -521,6 +521,23 @@ impl App {
         // Grup ici siralama: 0 calisanlar ustte (varsayilan), 1 duranlar ustte, 2 ada gore.
         let sort_id = egui::Id::new("svc_sort");
         let svc_sort: u8 = ui.ctx().data(|d| d.get_temp(sort_id)).unwrap_or(0);
+        // Acik gruplar (bit maskesi). Ilk yuklemede yalnizca en cok calisan servisi olan grup aciktir;
+        // arama ya da suzgec varken hepsi acik gosterilir.
+        let open_id = egui::Id::new("svc_open");
+        let mut open_mask: Option<u8> = ui.ctx().data(|d| d.get_temp(open_id));
+        if open_mask.is_none() && !list.is_empty() {
+            let best = Group::ALL
+                .iter()
+                .enumerate()
+                .filter(|(_, g)| **g != Group::Core || self.ui2.svc_core)
+                .max_by_key(|(_, g)| list.iter().filter(|x| x.group == **g && x.running).count())
+                .map_or(0, |(i, _)| i);
+            open_mask = Some(1u8 << best);
+            ui.ctx().data_mut(|d| d.insert_temp(open_id, 1u8 << best));
+        }
+        let open_mask = open_mask.unwrap_or(0);
+        let all_open = !f.is_empty() || self.ui2.svc_risky;
+        let is_open = |g: Group| all_open || open_mask & (1u8 << Group::ALL.iter().position(|x| *x == g).unwrap_or(0)) != 0;
         let mut lines: Vec<Line> = Vec::new();
         for g in Group::ALL {
             if g == Group::Core && !self.ui2.svc_core && !self.ui2.svc_risky && f.is_empty() {
@@ -555,14 +572,22 @@ impl App {
             });
             let run = idx.iter().filter(|i| list[**i].running).count();
             lines.push(Line::Head(g, idx.len(), run));
-            lines.extend(idx.into_iter().map(Line::Svc));
+            if is_open(g) {
+                lines.extend(idx.into_iter().map(Line::Svc));
+            }
         }
 
         let sel = self.ui2.svc_sel.clone();
         let mut flips: Vec<(String, bool)> = Vec::new();
         let mut group_flip: Option<(Group, bool)> = None;
+        let mut group_toggle: Option<Group> = None;
+        let heights: Vec<f32> = lines
+            .iter()
+            .map(|l| if matches!(l, Line::Head(..)) { 34.0 } else { 23.0 })
+            .collect();
         TableBuilder::new(ui)
             .striped(true)
+            .sense(egui::Sense::click())
             .resizable(true)
             .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
             .column(Column::initial(30.0))
@@ -613,7 +638,7 @@ impl App {
                 }
             })
             .body(|body| {
-                body.rows(23.0, lines.len(), |mut row| match &lines[row.index()] {
+                body.heterogeneous_rows(heights.into_iter(), |mut row| match &lines[row.index()] {
                     Line::Head(g, n, run) => {
                         let g = *g;
                         let col = match g {
@@ -622,7 +647,17 @@ impl App {
                             Group::Remote => c.orange,
                             _ => ui_text(row.index()),
                         };
+                        // Grup basligi: renkli serit; tiklaninca grup acilir / kapanir.
+                        let band = |ui: &mut egui::Ui| {
+                            let base = if col == Color32::PLACEHOLDER { ui.visuals().text_color() } else { col };
+                            ui.painter().rect_filled(
+                                ui.max_rect().expand2(egui::vec2(6.0, 0.0)).shrink2(egui::vec2(0.0, 2.0)),
+                                0.0,
+                                base.gamma_multiply(0.16),
+                            );
+                        };
                         row.col(|ui| {
+                            band(ui);
                             if !g.locked() {
                                 let members: Vec<&Service> =
                                     list.iter().filter(|x| x.group == g).collect();
@@ -640,21 +675,39 @@ impl App {
                             }
                         });
                         row.col(|ui| {
-                            let mut t = RichText::new(format!("■ {}", g.title())).strong();
+                            band(ui);
+                            let mut t = RichText::new(format!("{}  {}", if is_open(g) { "−" } else { "+" }, g.title()))
+                                .strong()
+                                .size(15.0);
                             if col != Color32::PLACEHOLDER {
                                 t = t.color(col);
                             }
                             ui.label(t);
                         });
                         row.col(|ui| {
-                            ui.label(RichText::new(tr!("{} açık", "{} running", run)).weak());
+                            band(ui);
+                            ui.label(RichText::new(tr!("{} açık", "{} running", run)).strong());
                         });
                         row.col(|ui| {
-                            ui.label(RichText::new(tr!("{} servis", "{} services", n)).weak());
+                            band(ui);
+                            ui.label(tr!("{} servis", "{} services", n));
                         });
-                        row.col(|_| {});
-                        row.col(|_| {});
-                        row.col(|_| {});
+                        row.col(band);
+                        row.col(band);
+                        row.col(|ui| {
+                            band(ui);
+                            ui.label(
+                                RichText::new(if is_open(g) {
+                                    tr!("Daraltmak için tıklayın", "Click to collapse")
+                                } else {
+                                    tr!("Servisleri görmek için tıklayın", "Click to show the services")
+                                })
+                                .weak(),
+                            );
+                        });
+                        if row.response().clicked() {
+                            group_toggle = Some(g);
+                        }
                     }
                     Line::Svc(i) => {
                         let x = &list[*i];
@@ -726,6 +779,10 @@ impl App {
                 self.ui2.svc_sel.remove(&n);
             }
             self.ui2.svc_confirm = None;
+        }
+        if let Some(g) = group_toggle {
+            let bit = 1u8 << Group::ALL.iter().position(|x| *x == g).unwrap_or(0);
+            ui.ctx().data_mut(|d| d.insert_temp(open_id, open_mask ^ bit));
         }
         if let Some((g, on)) = group_flip {
             for x in list.iter().filter(|x| x.group == g) {
