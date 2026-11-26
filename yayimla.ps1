@@ -46,7 +46,7 @@ Get-ChildItem release | ForEach-Object { '{0,-22} {1,10:N1} KB' -f $_.Name, ($_.
 
 if ($YalnizcaDerle) { return }
 
-gh release view "v$surum" --repo $depo *> $null
+cmd /c "gh release view v$surum --repo $depo >nul 2>nul"
 if ($LASTEXITCODE -eq 0) { throw "v$surum zaten yayımlanmış. Cargo.toml'daki sürümü artırın." }
 if (git status --porcelain) { throw 'Kaydedilmemiş değişiklik var; önce commit edip gönderin.' }
 Adim 'gönderim (git push)' { git push origin HEAD }
