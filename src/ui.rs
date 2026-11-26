@@ -1367,8 +1367,8 @@ impl App {
                 ui.label(RichText::new(t("Mod seçin", "Choose a mode")).size(16.0).strong());
                 ui.label(
                     RichText::new(t(
-                        "Fan hızını donanım belirler; mod, işlemcinin ürettiği ısıyı azaltarak fanı yavaşlatır. Modlar ayrı bir \"HFix\" güç planına yazılır, kendi planlarınıza dokunulmaz.",
-                        "Fan speed is set by the hardware; a mode slows the fan by reducing the heat the CPU produces. Modes are written to a separate \"HFix\" power plan; your own plans are not touched.",
+                        "Fan hızını donanım belirler; mod, işlemcinin ürettiği ısıyı azaltarak fanı yavaşlatır. Modlar ayrı bir \"HFix\" güç planına yazılır, kendi planlarınıza dokunulmaz. Sessiz dışındaki modlarda prizdeyken ekran boşta kapanmaz.",
+                        "Fan speed is set by the hardware; a mode slows the fan by reducing the heat the CPU produces. Modes are written to a separate \"HFix\" power plan; your own plans are not touched. In every mode except Quiet the screen stays on while plugged in.",
                     ))
                     .weak(),
                 );
@@ -1381,8 +1381,8 @@ impl App {
                         5,
                         2,
                         t(
-                            "Turbo kapalı, üst sınır %99. Ağır işlerde yaklaşık %30 yavaşlar.",
-                            "Turbo off, maximum 99%. Heavy work runs about 30% slower.",
+                            "Turbo kapalı, üst sınır %99. Ağır işlerde yaklaşık %30 yavaşlar. Prizdeyken ekran 10 dakika sonra kapanır.",
+                            "Turbo off, maximum 99%. Heavy work runs about 30% slower. When plugged in, the screen turns off after 10 minutes.",
                         ),
                     ),
                     (

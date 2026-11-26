@@ -502,6 +502,10 @@ pub fn power_apply(mode: PowerMode) -> bool {
     set("/setdcvalueindex", P_EPP, dc_epp);
     set("/setdcvalueindex", P_BOOST, if boost == 0 { 0 } else { 3 });
     set("/setdcvalueindex", P_PARK, park.min(50));
+    // Prizdeyken ekran: Sessiz disindaki modlarda bosta kapanmaz (0 = hicbir zaman); Sessiz modda
+    // 10 dakika sonra kapanir. Pildeki sure ve uyku ayari kullanicinin biraktigi gibi kalir.
+    let screen = if mode == PowerMode::Quiet { "600" } else { "0" };
+    run_status("powercfg", &["/setacvalueindex", FB_PLAN, "SUB_VIDEO", "VIDEOIDLE", screen]);
     run_status("powercfg", &["/setactive", FB_PLAN])
 }
 
