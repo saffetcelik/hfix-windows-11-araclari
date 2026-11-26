@@ -1182,6 +1182,50 @@ impl App {
         }
     }
 
+    // ------------------------------------------- Windows ile baslatma (ortak)
+
+    /// Baslangic gorevinin durumu; ilk cagrida arka planda okunur (None: henuz okunmadi).
+    pub(crate) fn autostart_state(&mut self, ctx: &egui::Context) -> Option<bool> {
+        if !self.ui.autostart_asked {
+            self.ui.autostart_asked = true;
+            let (a, ctx) = (self.ui.autostart.clone(), ctx.clone());
+            std::thread::spawn(move || {
+                let v = win::autostart_enabled();
+                if let Ok(mut g) = a.lock() {
+                    *g = Some(v);
+                }
+                ctx.request_repaint();
+            });
+        }
+        self.ui.autostart.lock().ok().and_then(|g| *g)
+    }
+
+    /// Baslangic gorevini olusturur ya da siler ve sonucu isleme kaydina yazar.
+    pub(crate) fn autostart_change(&mut self, ctx: &egui::Context, on: bool) {
+        let (a, tx, ctx) = (self.ui.autostart.clone(), self.tx.clone(), ctx.clone());
+        std::thread::spawn(move || {
+            let ok = win::autostart_set(on);
+            let now = win::autostart_enabled();
+            if let Ok(mut g) = a.lock() {
+                *g = Some(now);
+            }
+            let _ = tx.send(Cmd::Note(if ok {
+                tr!(
+                    "Windows ile başlatma {}.",
+                    "Start with Windows {}.",
+                    if on { t("açıldı", "turned on") } else { t("kapatıldı", "turned off") }
+                )
+            } else {
+                t(
+                    "Windows ile başlatma değiştirilemedi (yönetici modu gerekir).",
+                    "Start with Windows could not be changed (administrator mode required).",
+                )
+                .into()
+            }));
+            ctx.request_repaint();
+        });
+    }
+
     // ------------------------------------------------------ Guc / Hizlandir
 
     pub(crate) fn power_tab(&mut self, ui: &mut egui::Ui, s: &Snapshot) {

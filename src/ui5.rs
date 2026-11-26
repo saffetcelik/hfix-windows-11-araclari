@@ -75,6 +75,62 @@ impl App {
             });
             ui.add_space(10.0);
 
+            let autostart = self.autostart_state(ui.ctx());
+            let admin = win::is_admin();
+            let mut set_autostart: Option<bool> = None;
+            card(ui).show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                section(
+                    ui,
+                    t("Başlangıç", "Startup"),
+                    t(
+                        "Program Windows açılırken kendiliğinden başlar ve pencere açmadan sistem tepsisinde (saatin yanında) çalışır.",
+                        "The program starts by itself when Windows starts and runs in the system tray (next to the clock) without opening a window.",
+                    ),
+                );
+                match autostart {
+                    None => {
+                        ui.horizontal(|ui| {
+                            ui.spinner();
+                            ui.label(t("Durum okunuyor…", "Reading the status…"));
+                        });
+                    }
+                    Some(v) => {
+                        let mut on = v;
+                        if ui
+                            .add_enabled(
+                                admin,
+                                egui::Checkbox::new(
+                                    &mut on,
+                                    t(
+                                        "Windows açılışında otomatik başlat (tepside)",
+                                        "Start with Windows (in the tray)",
+                                    ),
+                                ),
+                            )
+                            .on_disabled_hover_text(t(
+                                "Bunu değiştirmek için programı yönetici olarak açın.",
+                                "Open the program as administrator to change this.",
+                            ))
+                            .changed()
+                        {
+                            set_autostart = Some(on);
+                        }
+                    }
+                }
+                ui.label(
+                    RichText::new(t(
+                        "Bunun için Görev Zamanlayıcı'da \"HFixWin11\" adlı bir görev oluşturulur; böylece her açılışta yönetici onayı (UAC) sorulmaz. Kutunun işaretini kaldırınca görev silinir.",
+                        "A task named \"HFixWin11\" is created in Task Scheduler for this, so administrator approval (UAC) is not asked at every start. Unticking the box deletes the task.",
+                    ))
+                    .weak(),
+                );
+            });
+            if let Some(on) = set_autostart {
+                self.autostart_change(ui.ctx(), on);
+            }
+            ui.add_space(10.0);
+
             card(ui).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 section(ui, t("Güncelleme", "Updates"), "");
@@ -134,8 +190,8 @@ impl App {
                 }
                 ui.label(
                     RichText::new(t(
-                        "Ayarlar, yedekler ve karantina bu klasörde durur. \"Windows ile başlat\" seçeneği Güç Modu sayfasındadır.",
-                        "Settings, backups and the quarantine are kept in this folder. The \"Start with Windows\" option is on the Power Mode page.",
+                        "Ayarlar, yedekler ve karantina bu klasörde durur.",
+                        "Settings, backups and the quarantine are kept in this folder.",
                     ))
                     .weak(),
                 );

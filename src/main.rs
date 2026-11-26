@@ -447,7 +447,7 @@ impl Tab {
                 "Scanning for suspicious programs, files and settings",
             ),
             Tab::Log => lang::t("Programın yaptığı işlemlerin kaydı", "A record of what the program did"),
-            Tab::Settings => lang::t("Tema, dil ve güncelleme tercihleri", "Theme, language and update preferences"),
+            Tab::Settings => lang::t("Tema, dil, başlangıç ve güncelleme tercihleri", "Theme, language, startup and update preferences"),
             Tab::About => lang::t("Sürüm bilgisi ve güncelleme", "Version information and updates"),
         }
     }

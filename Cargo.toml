@@ -3,7 +3,7 @@ description = "HFix Windows 11 Araclari: Windows 11 icin bakim ve hizlandirma ar
 license = "MIT"
 repository = "https://github.com/saffetcelik/hfix-windows-11-araclari"
 name = "hfixwin11"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 
 [[bin]]
