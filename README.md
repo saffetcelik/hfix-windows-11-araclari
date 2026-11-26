@@ -70,6 +70,7 @@ cargo +stable-x86_64-pc-windows-gnu build --release
 | `src/clean.rs`, `src/apps.rs` | Disk temizliği ve yüklü programlar |
 | `src/update.rs` | Güncellemenin imza, sürüm ve özet denetimi (`cargo test`) |
 | `src/install.rs` | Kendi kendine kurulum, kısayollar, kaldırma |
+| `src/stamp.rs` | Derlenen exe'ye sürüm bilgisi ve simge ekleme (kaynak derleyicisi gerekmez) |
 | `src/lang.rs` | Türkçe / İngilizce arayüz |
 
 ### Sürüm yayımlama
@@ -85,6 +86,10 @@ powershell -ExecutionPolicy Bypass -File yayimla.ps1 -Anahtar <gizli anahtar dos
 programı derler, test eder, imzalar, imzayı programdaki açık anahtarla doğrular ve sürümü yayımlar.
 
 İmza anahtarının gizli yarısı depoda durmaz; iş akışı onu `HFIX_IMZA_ANAHTARI` adlı depo sırrından okur. Anahtar `HFixWin11.exe --anahtar-uret <dosya>` ile bir kez üretilmiştir. Kaybolursa yeni anahtarla imzalanan sürümleri kurulu programlar kabul etmez.
+
+## Kod imzalama politikası
+
+*Code signing policy.* Yayımlanan exe henüz Authenticode ile imzalı değildir; ücretsiz açık kaynak imzalama için [SignPath Foundation](https://signpath.org) başvurusu hazırlanmaktadır. Kaynak, derleme, roller ve gizlilik beyanı için: [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md). Exe; ürün adı, sürüm ve yayıncı bilgisini içinde taşır (Özellikler → Ayrıntılar).
 
 ## Lisans
 

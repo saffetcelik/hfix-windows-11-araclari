@@ -72,7 +72,7 @@ pub fn ico() -> Vec<u8> {
     out
 }
 
-fn bmp_entry(n: usize) -> Vec<u8> {
+pub fn bmp_entry(n: usize) -> Vec<u8> {
     let px = rgba(n);
     let mut out = Vec::with_capacity(40 + n * n * 4 + n * n / 8);
     out.extend_from_slice(&40u32.to_le_bytes());

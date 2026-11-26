@@ -15,6 +15,7 @@ mod tweak;
 mod ui4;
 mod ui3;
 mod sig;
+mod stamp;
 mod startup;
 mod svc;
 mod tasks;
@@ -76,6 +77,7 @@ fn main() {
         (Some("--anahtar-uret"), 3) => std::process::exit(update::cmd_keygen(&args[2])),
         (Some("--imzala"), 5) => std::process::exit(update::cmd_sign(&args[2], &args[3], &args[4])),
         (Some("--imza-dogrula"), 4) => std::process::exit(update::cmd_verify(&args[2], &args[3])),
+        (Some("--damgala"), 3) => std::process::exit(stamp::cmd_stamp(&args[2])),
         _ => {}
     }
 

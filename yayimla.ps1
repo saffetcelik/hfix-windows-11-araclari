@@ -36,6 +36,10 @@ Copy-Item (Join-Path $hedef 'release\HFixWin11.exe') release\HFixWin11.exe -Forc
 $exe = (Resolve-Path release\HFixWin11.exe).Path
 $sig = "$exe.sig"
 
+# Sürüm bilgisi ve simge: derlenen exe, kopyasını damgalar (kaynak derleyicisi gerekmez).
+Write-Host '==> sürüm bilgisi ve simge ekleniyor'
+if ((Calistir (Join-Path $hedef 'release\HFixWin11.exe') @('--damgala', "`"$exe`"")) -ne 0) { throw 'exe damgalanamadı' }
+
 Write-Host '==> imzalama'
 $kod = Calistir $exe @('--imzala', "`"$Anahtar`"", "`"$exe`"", "`"$sig`"")
 if ($kod -eq 2) { throw 'Bu anahtar programa gömülü açık anahtarla eşleşmiyor; kurulu programlar bu sürümü kabul etmez.' }

@@ -73,6 +73,9 @@ jobs:
           New-Item -ItemType Directory -Force release | Out-Null
           Copy-Item target\release\HFixWin11.exe release\HFixWin11.exe
           $exe = (Resolve-Path release\HFixWin11.exe).Path
+          # Sürüm bilgisi ve simge: derlenen exe, kopyasını damgalar.
+          $p = Start-Process target\release\HFixWin11.exe -ArgumentList '--damgala', $exe -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw 'exe damgalanamadı' }
           $sig = "$exe.sig"
           $key = Join-Path $env:RUNNER_TEMP 'imza-anahtari.txt'
           [IO.File]::WriteAllText($key, $env:HFIX_IMZA_ANAHTARI.Trim())
