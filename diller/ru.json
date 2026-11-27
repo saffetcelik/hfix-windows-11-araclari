@@ -950,5 +950,7 @@
  "SPEED UP": "УСКОРЕНИЕ",
  "MAINTENANCE": "ОБСЛУЖИВАНИЕ",
  "SECURITY": "БЕЗОПАСНОСТЬ",
- "PROGRAM": "ПРОГРАММА"
+ "PROGRAM": "ПРОГРАММА",
+ "Windows 10: {} settings that exist only on Windows 11 are not shown.": "Windows 10: параметры, доступные только в Windows 11, скрыты: {}.",
+ "This computer: {} (build {})": "Этот компьютер: {} (сборка {})"
 }

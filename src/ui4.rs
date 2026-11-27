@@ -247,6 +247,16 @@ impl App {
                 .weak(),
             );
         });
+        if tweak::hidden_count() > 0 {
+            ui.label(
+                RichText::new(tr!(
+                    "Windows 10: yalnızca Windows 11'de bulunan {} ayar gösterilmiyor.",
+                    "Windows 10: {} settings that exist only on Windows 11 are not shown.",
+                    tweak::hidden_count()
+                ))
+                .weak(),
+            );
+        }
         ui.separator();
 
         if self.ui4.view_apps {

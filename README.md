@@ -15,7 +15,7 @@ Windows 11 için **ücretsiz ve açık kaynak** bakım, hızlandırma ve güvenl
 - Program sistem ayarlarını değiştirebildiği için açılışta **yönetici izni** (UAC) ister.
 - Henüz kod imzalı olmadığı için Windows SmartScreen ilk açılışta "Ek bilgi → Yine de çalıştır" sorabilir.
 - Kaldırmak için: **Windows Ayarları → Uygulamalar → Yüklü uygulamalar → HFix Windows 11 Araçları → Kaldır**.
-- Windows 10'da da çalışır; hızlandırma ayarlarının bir bölümü yalnızca Windows 11'e özgüdür.
+- **Windows 10 (sürüm 1809 ve sonrası) desteklenir.** Program Windows sürümünü kendisi algılar; Windows 10'da yalnızca Windows 11'de bulunan 9 ayarı (Recall, Widgets, eski sağ tık menüsü, görev çubuğu hizası vb.) göstermez. Diğer bütün özellikler iki sürümde de aynıdır.
 
 ## Özellikler
 
@@ -109,7 +109,7 @@ programı derler, test eder, imzalar, imzayı programdaki açık anahtarla doğr
 
 Everything is reversible: previous values are backed up and restored by "Undo". Tweaks that weaken security (disabling Defender, Windows Update, CPU mitigations or UAC) are deliberately left out.
 
-**Install:** download **`HFixWin11.exe`** from [Releases](../../releases/latest) and run it. It installs itself to `%LOCALAPPDATA%\HFixWin11`, puts a shortcut on the desktop and in the Start menu, and asks for administrator rights (UAC) on start because it changes system settings. New versions are downloaded automatically and installed only if their Ed25519 signature, version and SHA-256 digest match. The interface is available in 12 languages (Turkish, English, Simplified Chinese, Spanish, Brazilian Portuguese, German, French, Russian, Italian, Japanese, Korean, Arabic) and opens in the Windows display language; language and light / dark theme can be changed under **Settings**.
+**Install:** download **`HFixWin11.exe`** from [Releases](../../releases/latest) and run it. It also runs on Windows 10 (1809 or later), where the 9 tweaks that exist only on Windows 11 are hidden automatically. It installs itself to `%LOCALAPPDATA%\HFixWin11`, puts a shortcut on the desktop and in the Start menu, and asks for administrator rights (UAC) on start because it changes system settings. New versions are downloaded automatically and installed only if their Ed25519 signature, version and SHA-256 digest match. The interface is available in 12 languages (Turkish, English, Simplified Chinese, Spanish, Brazilian Portuguese, German, French, Russian, Italian, Japanese, Korean, Arabic) and opens in the Windows display language; language and light / dark theme can be changed under **Settings**.
 
 **Build:** `cargo +stable-x86_64-pc-windows-gnu build --release` (Rust only, no other dependencies).
 

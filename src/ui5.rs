@@ -222,6 +222,15 @@ impl App {
                 ui.set_width(ui.available_width());
                 ui.label(RichText::new(lang::app_name()).size(22.0).strong());
                 ui.label(tr!("Sürüm {}", "Version {}", update::VERSION));
+                ui.label(
+                    RichText::new(tr!(
+                        "Bu bilgisayar: {} (derleme {})",
+                        "This computer: {} (build {})",
+                        win::os_name(),
+                        win::build()
+                    ))
+                    .weak(),
+                );
                 ui.add_space(4.0);
                 ui.label(t(
                     "Windows 11 için ücretsiz, açık kaynak bakım ve hızlandırma aracı: süreç ve ağ izleme, RAM ve disk temizliği, güç modları, başlangıç ve servis yönetimi, Windows ayarlarıyla hızlandırma ve risk taraması.",

@@ -950,5 +950,7 @@
  "SPEED UP": "加速",
  "MAINTENANCE": "维护",
  "SECURITY": "安全",
- "PROGRAM": "程序"
+ "PROGRAM": "程序",
+ "Windows 10: {} settings that exist only on Windows 11 are not shown.": "Windows 10：仅在 Windows 11 中提供的 {} 项设置未显示。",
+ "This computer: {} (build {})": "此电脑：{}（版本 {}）"
 }

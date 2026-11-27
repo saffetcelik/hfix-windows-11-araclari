@@ -94,7 +94,28 @@ fn t(
     }
 }
 
+/// Yalnizca Windows 11'de bulunan ozellikleri degistiren ayarlar. Windows 10'da kayit degeri
+/// yazilsa da hicbir etkisi olmaz; bu yuzden orada gosterilmezler.
+const WIN11_ONLY: [&str; 9] = [
+    "recall", "widgets", "uygulamaai", "eskimenu", "solahizala", "yaslama", "gezginev", "pilyuzde", "sikisik",
+];
+
+/// Bu bilgisayarda gecerli olmadigi icin gizlenen ayar sayisi.
+pub fn hidden_count() -> usize {
+    if win::is_win11() {
+        0
+    } else {
+        WIN11_ONLY.len()
+    }
+}
+
+/// Bu bilgisayarin Windows surumunde gecerli olan ayarlar.
 pub fn all() -> Vec<Tweak> {
+    let win11 = win::is_win11();
+    catalog().into_iter().filter(|t| win11 || !WIN11_ONLY.contains(&t.id)).collect()
+}
+
+fn catalog() -> Vec<Tweak> {
     vec![
         // ------------------------------------------------ gizlilik
         t("telemetri", 0, true, "Telemetriyi en düşük düzeye indir", "Reduce telemetry to the minimum",

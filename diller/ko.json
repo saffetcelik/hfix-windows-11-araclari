@@ -950,5 +950,7 @@
  "SPEED UP": "속도 향상",
  "MAINTENANCE": "유지 관리",
  "SECURITY": "보안",
- "PROGRAM": "프로그램"
+ "PROGRAM": "프로그램",
+ "Windows 10: {} settings that exist only on Windows 11 are not shown.": "Windows 10: Windows 11에만 있는 설정 {}개는 표시되지 않습니다.",
+ "This computer: {} (build {})": "이 PC: {}(빌드 {})"
 }

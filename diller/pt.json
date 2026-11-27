@@ -950,5 +950,7 @@
  "SPEED UP": "ACELERAR",
  "MAINTENANCE": "MANUTENÇÃO",
  "SECURITY": "SEGURANÇA",
- "PROGRAM": "PROGRAMA"
+ "PROGRAM": "PROGRAMA",
+ "Windows 10: {} settings that exist only on Windows 11 are not shown.": "Windows 10: {} configurações que só existem no Windows 11 não são exibidas.",
+ "This computer: {} (build {})": "Este computador: {} (compilação {})"
 }

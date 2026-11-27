@@ -87,6 +87,48 @@ extern "system" {
 #[link(name = "ntdll")]
 extern "system" {
     fn NtSetSystemInformation(class: i32, info: *mut c_void, len: u32) -> i32;
+    fn RtlGetVersion(info: *mut OsVersion) -> i32;
+}
+
+#[repr(C)]
+struct OsVersion {
+    size: u32,
+    major: u32,
+    minor: u32,
+    build: u32,
+    platform: u32,
+    csd: [u16; 128],
+}
+
+/// Windows derleme numarasi (ornegin 19045 Windows 10 22H2, 22631 Windows 11 23H2). Uyumluluk
+/// katmanindan etkilenmesin diye RtlGetVersion ile okunur. Test: FB_DERLEME ortam degiskeni ezer.
+pub fn build() -> u32 {
+    static B: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *B.get_or_init(|| {
+        if let Some(b) = std::env::var("FB_DERLEME").ok().and_then(|v| v.parse().ok()) {
+            return b;
+        }
+        let mut v = OsVersion { size: std::mem::size_of::<OsVersion>() as u32, major: 0, minor: 0, build: 0, platform: 0, csd: [0; 128] };
+        if unsafe { RtlGetVersion(&mut v) } == 0 {
+            v.build
+        } else {
+            22000
+        }
+    })
+}
+
+/// Windows 11 mi? (Windows 11 derleme numaralari 22000 ile baslar.)
+pub fn is_win11() -> bool {
+    build() >= 22000
+}
+
+/// "Windows 11" ya da "Windows 10".
+pub fn os_name() -> &'static str {
+    if is_win11() {
+        "Windows 11"
+    } else {
+        "Windows 10"
+    }
 }
 #[link(name = "shell32")]
 extern "system" {
