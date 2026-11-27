@@ -115,6 +115,15 @@ fn load(l: &Lang) -> HashMap<String, &'static str> {
         .collect()
 }
 
+/// Dilin kendi yazisiyla gosterilecek adi (sagdan sola dillerde sekillendirilmis).
+pub fn display_name(l: &Lang) -> String {
+    if l.rtl {
+        rtl(l.name)
+    } else {
+        l.name.to_string()
+    }
+}
+
 /// Gecerli dil.
 pub fn current() -> &'static Lang {
     &LANGS[CUR.load(Ordering::Relaxed)]

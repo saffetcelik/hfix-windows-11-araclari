@@ -952,5 +952,6 @@
  "SECURITY": "セキュリティ",
  "PROGRAM": "プログラム",
  "Windows 10: {} settings that exist only on Windows 11 are not shown.": "Windows 10: Windows 11 にのみ存在する {} 個の設定は表示されません。",
- "This computer: {} (build {})": "この PC: {} (ビルド {})"
+ "This computer: {} (build {})": "この PC: {} (ビルド {})",
+ "The Windows display language": "Windows の表示言語"
 }

@@ -11,6 +11,14 @@ from pathlib import Path
 DILLER = Path(__file__).resolve().parent.parent / "diller"
 
 T = {
+    "The Windows display language": {
+        "zh": "Windows 显示语言", "zh-tw": "Windows 顯示語言", "es": "El idioma de visualización de Windows",
+        "pt": "O idioma de exibição do Windows", "de": "Die Anzeigesprache von Windows", "fr": "La langue d'affichage de Windows",
+        "ru": "Язык интерфейса Windows", "uk": "Мова інтерфейсу Windows", "it": "La lingua di visualizzazione di Windows",
+        "nl": "De weergavetaal van Windows", "pl": "Język wyświetlania systemu Windows", "cs": "Jazyk zobrazení systému Windows",
+        "id": "Bahasa tampilan Windows", "vi": "Ngôn ngữ hiển thị của Windows", "ja": "Windows の表示言語",
+        "ko": "Windows 표시 언어", "ar": "لغة عرض Windows", "fa": "زبان نمایش Windows",
+    },
     "Windows 10: {} settings that exist only on Windows 11 are not shown.": {
         "zh": "Windows 10：仅在 Windows 11 中提供的 {} 项设置未显示。",
         "es": "Windows 10: no se muestran {} ajustes que solo existen en Windows 11.",
@@ -37,9 +45,12 @@ T = {
     },
 }
 
-for code in ["zh", "es", "pt", "de", "fr", "ru", "it", "ja", "ko", "ar"]:
-    p = DILLER / f"{code}.json"
+for p in sorted(DILLER.glob("*.json")):
+    code = p.stem
+    if code == "en" or code.startswith("_"):
+        continue
     d = json.loads(p.read_text(encoding="utf-8"))
     for en, tr in T.items():
-        d[en] = tr[code]
+        if code in tr:
+            d[en] = tr[code]
     p.write_text(json.dumps(d, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")

@@ -952,5 +952,6 @@
  "SECURITY": "SEGURANÇA",
  "PROGRAM": "PROGRAMA",
  "Windows 10: {} settings that exist only on Windows 11 are not shown.": "Windows 10: {} configurações que só existem no Windows 11 não são exibidas.",
- "This computer: {} (build {})": "Este computador: {} (compilação {})"
+ "This computer: {} (build {})": "Este computador: {} (compilação {})",
+ "The Windows display language": "O idioma de exibição do Windows"
 }

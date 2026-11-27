@@ -62,29 +62,35 @@ impl App {
                 );
                 // Dil adlari kendi yazilariyla gosterilir; Cince, Japonca ve Korece yazi tiplerini yukle.
                 crate::fonts::ensure(ui.ctx(), crate::fonts::ALL);
-                ui.horizontal(|ui| {
-                    ui.label(t("Dil:", "Language:"));
-                    let mut l = self.cfg.lang.clone();
-                    let shown = lang::LANGS
-                        .iter()
-                        .find(|x| x.code == l)
-                        .map_or_else(|| t("Otomatik", "Automatic").to_string(), |x| x.name.to_string());
-                    egui::ComboBox::from_id_salt("dil")
-                        .selected_text(shown)
-                        .width(220.0)
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut l, "oto".to_string(), t("Otomatik", "Automatic"));
-                            for x in &lang::LANGS {
-                                ui.selectable_value(&mut l, x.code.to_string(), x.name)
-                                    .on_hover_text(x.english);
-                            }
-                        });
-                    if l != self.cfg.lang {
-                        self.cfg.lang = l;
-                        cfg::save(&self.cfg);
-                        lang::set(&self.cfg.lang);
+                // Butun diller dugme olarak gorunur: acilir listede kaydirma cubugu fark edilmiyordu.
+                let mut l = self.cfg.lang.clone();
+                let auto = !lang::LANGS.iter().any(|x| x.code == l);
+                ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+                ui.horizontal_wrapped(|ui| {
+                    let size = egui::vec2(168.0, 30.0);
+                    let label = format!("{} ({})", t("Otomatik", "Automatic"), lang::display_name(lang::current()));
+                    if ui
+                        .add_sized(size, egui::SelectableLabel::new(auto, label))
+                        .on_hover_text(t("Windows'un görüntüleme dili", "The Windows display language"))
+                        .clicked()
+                    {
+                        l = "oto".to_string();
+                    }
+                    for x in &lang::LANGS {
+                        if ui
+                            .add_sized(size, egui::SelectableLabel::new(!auto && l == x.code, lang::display_name(x)))
+                            .on_hover_text(x.english)
+                            .clicked()
+                        {
+                            l = x.code.to_string();
+                        }
                     }
                 });
+                if l != self.cfg.lang {
+                    self.cfg.lang = l;
+                    cfg::save(&self.cfg);
+                    lang::set(&self.cfg.lang);
+                }
             });
             ui.add_space(10.0);
 
