@@ -56,16 +56,29 @@ impl App {
                     ui,
                     t("Dil", "Language"),
                     t(
-                        "\"Otomatik\" seçiliyken Windows Türkçe ise Türkçe, değilse İngilizce açılır.",
-                        "With \"Automatic\" the program opens in Turkish if Windows is in Turkish, otherwise in English.",
+                        "\"Otomatik\" seçiliyken program Windows'un görüntüleme dilinde açılır; o dil listede yoksa İngilizce açılır.",
+                        "With \"Automatic\" the program opens in the display language of Windows, or in English if that language is not in the list.",
                     ),
                 );
+                // Dil adlari kendi yazilariyla gosterilir; Cince, Japonca ve Korece yazi tiplerini yukle.
+                crate::fonts::ensure(ui.ctx(), crate::fonts::ALL);
                 ui.horizontal(|ui| {
                     ui.label(t("Dil:", "Language:"));
                     let mut l = self.cfg.lang.clone();
-                    ui.selectable_value(&mut l, "oto".to_string(), t("Otomatik", "Automatic"));
-                    ui.selectable_value(&mut l, "tr".to_string(), "Türkçe");
-                    ui.selectable_value(&mut l, "en".to_string(), "English");
+                    let shown = lang::LANGS
+                        .iter()
+                        .find(|x| x.code == l)
+                        .map_or_else(|| t("Otomatik", "Automatic").to_string(), |x| x.name.to_string());
+                    egui::ComboBox::from_id_salt("dil")
+                        .selected_text(shown)
+                        .width(220.0)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut l, "oto".to_string(), t("Otomatik", "Automatic"));
+                            for x in &lang::LANGS {
+                                ui.selectable_value(&mut l, x.code.to_string(), x.name)
+                                    .on_hover_text(x.english);
+                            }
+                        });
                     if l != self.cfg.lang {
                         self.cfg.lang = l;
                         cfg::save(&self.cfg);

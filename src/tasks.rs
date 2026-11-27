@@ -199,7 +199,7 @@ fn parse(name: String, path: String, xml: &str) -> Task {
             trust = tr!(
                 "Şüpheli komut: {}",
                 "Suspicious command: {}",
-                if crate::lang::en() { why.2 } else { why.1 }
+                crate::lang::t(why.1, why.2)
             );
         } else if script && !microsoft && risk <= Risk::Ok {
             risk = Risk::Unsigned;

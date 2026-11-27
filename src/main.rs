@@ -4,6 +4,7 @@
 mod apps;
 mod cfg;
 mod clean;
+mod fonts;
 mod icon;
 mod install;
 mod lang;
@@ -1157,6 +1158,8 @@ impl eframe::App for App {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             tray::hide_main();
         }
+        // Latin disi yazilar icin gereken yazi tipleri (yalnizca eksikse bir kez yuklenir).
+        fonts::ensure(ctx, 0);
         let s = self.shared.lock().map(|s| s.clone()).unwrap_or_default();
         if let Some(path) = self.shot.clone() {
             ctx.request_repaint();

@@ -73,7 +73,7 @@ pub fn load() -> Cfg {
             // Eski surum: yalnizca acik/koyu vardi ve varsayilan koyuydu. Acik secilmisse bu
             // kullanicinin tercihidir; koyu ise bilemeyiz, sistemi izleriz.
             "acik_tema" if !theme_set && b => c.theme = Theme::Light,
-            "dil" if v == "tr" || v == "en" => c.lang = v.to_string(),
+            "dil" if crate::lang::LANGS.iter().any(|l| l.code == v) => c.lang = v.to_string(),
             "oto_guncelle" => c.auto_update = b,
             "grupla" => c.group = b,
             "oto_ram" => c.auto.ram_on = b,

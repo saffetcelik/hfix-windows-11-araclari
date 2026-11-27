@@ -39,7 +39,7 @@ Ayrıca:
 - **Geri alınabilir.** Hızlandırma ayarlarının ve servislerin önceki değerleri yedeklenir; "Geri al" eski değeri geri koyar. İstenirse önce sistem geri yükleme noktası oluşturulur.
 - **Güvenliği azaltan ayar yok.** Defender'ı, Windows Update'i, işlemci korumalarını ya da UAC'yi kapatan ayarlar bilerek eklenmedi.
 - **Sistem tepsisi.** Pencereyi kapatmak programı kapatmaz; tepside çalışmaya devam eder.
-- **Türkçe ve İngilizce** arayüz; Windows Türkçe ise Türkçe, değilse İngilizce açılır. Açık / koyu tema Windows ayarını izler. İkisi de **Ayarlar** sayfasından değiştirilebilir.
+- **12 dil:** Türkçe, English, 简体中文, Español, Português (Brasil), Deutsch, Français, Русский, Italiano, 日本語, 한국어, العربية. Program Windows'un görüntüleme dilinde açılır (listede yoksa İngilizce). Açık / koyu tema Windows ayarını izler. İkisi de **Ayarlar** sayfasından değiştirilebilir.
 
 Hızlandırma ayarları [Win11Debloat](https://github.com/Raphire/Win11Debloat), [AtlasOS](https://github.com/Atlas-OS/Atlas), [ReviOS](https://github.com/meetrevision/playbook) ve [WinUtil](https://github.com/ChrisTitusTech/winutil) projelerinin ayar kataloglarından derlenmiştir; onarım komutları ve DNS listesi WinUtil ile [Optimizer](https://github.com/hellzerg/optimizer) ile aynıdır.
 
@@ -71,7 +71,8 @@ cargo +stable-x86_64-pc-windows-gnu build --release
 | `src/update.rs` | Güncellemenin imza, sürüm ve özet denetimi (`cargo test`) |
 | `src/install.rs` | Kendi kendine kurulum, kısayollar, kaldırma |
 | `src/stamp.rs` | Derlenen exe'ye sürüm bilgisi ve simge ekleme (kaynak derleyicisi gerekmez) |
-| `src/lang.rs` | Türkçe / İngilizce arayüz |
+| `src/lang.rs`, `diller/` | Arayüz dilleri: metinler kodda Türkçe ve İngilizce, diğer diller `diller/<kod>.json` (İngilizce metin → çeviri). Yeni metinleri listelemek için `python tools/metinler.py cikar`, çevirileri denetlemek için `python tools/metinler.py denetle` |
+| `src/fonts.rs` | Çince, Japonca, Korece ve Arapça için Windows yazı tiplerini yükleme |
 
 ### Sürüm yayımlama
 
@@ -108,7 +109,7 @@ programı derler, test eder, imzalar, imzayı programdaki açık anahtarla doğr
 
 Everything is reversible: previous values are backed up and restored by "Undo". Tweaks that weaken security (disabling Defender, Windows Update, CPU mitigations or UAC) are deliberately left out.
 
-**Install:** download **`HFixWin11.exe`** from [Releases](../../releases/latest) and run it. It installs itself to `%LOCALAPPDATA%\HFixWin11`, puts a shortcut on the desktop and in the Start menu, and asks for administrator rights (UAC) on start because it changes system settings. New versions are downloaded automatically and installed only if their Ed25519 signature, version and SHA-256 digest match. The interface opens in Turkish when Windows is in Turkish and in English otherwise; language and light / dark theme can be changed under **Settings**.
+**Install:** download **`HFixWin11.exe`** from [Releases](../../releases/latest) and run it. It installs itself to `%LOCALAPPDATA%\HFixWin11`, puts a shortcut on the desktop and in the Start menu, and asks for administrator rights (UAC) on start because it changes system settings. New versions are downloaded automatically and installed only if their Ed25519 signature, version and SHA-256 digest match. The interface is available in 12 languages (Turkish, English, Simplified Chinese, Spanish, Brazilian Portuguese, German, French, Russian, Italian, Japanese, Korean, Arabic) and opens in the Windows display language; language and light / dark theme can be changed under **Settings**.
 
 **Build:** `cargo +stable-x86_64-pc-windows-gnu build --release` (Rust only, no other dependencies).
 

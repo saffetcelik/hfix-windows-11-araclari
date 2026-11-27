@@ -51,11 +51,7 @@ pub const GROUPS_EN: [(&str, &str); 5] = [
 
 /// Grubun gecerli dildeki (basligi, aciklamasi).
 pub fn group(i: usize) -> (&'static str, &'static str) {
-    if crate::lang::en() {
-        GROUPS_EN[i]
-    } else {
-        GROUPS[i]
-    }
+    (crate::lang::t(GROUPS[i].0, GROUPS_EN[i].0), crate::lang::t(GROUPS[i].1, GROUPS_EN[i].1))
 }
 
 const CDM: &str = r"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager";
@@ -88,12 +84,11 @@ fn t(
     desc_en: &'static str,
     ops: Vec<Op>,
 ) -> Tweak {
-    let en = crate::lang::en();
     Tweak {
         id,
         group,
-        name: if en { name_en } else { name },
-        desc: if en { desc_en } else { desc },
+        name: crate::lang::t(name, name_en),
+        desc: crate::lang::t(desc, desc_en),
         rec,
         ops,
     }
@@ -784,7 +779,6 @@ pub fn apps() -> Vec<App> {
     ) else {
         return Vec::new();
     };
-    let en = crate::lang::en();
     let mut v: Vec<App> = out
         .lines()
         .filter_map(|l| l.trim().split_once('|'))
@@ -794,7 +788,7 @@ pub fn apps() -> Vec<App> {
             Some(App {
                 name: name.to_string(),
                 full: full.to_string(),
-                label: if en { b.2 } else { b.1 },
+                label: crate::lang::t(b.1, b.2),
                 rec: b.3,
             })
         })

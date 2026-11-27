@@ -206,12 +206,11 @@ impl App {
                     }
                 }
                 ui.add_space(6.0);
-                let en = crate::lang::en();
                 for (i, (tr_name, en_name, tr_desc, en_desc, addrs)) in DNS.iter().enumerate() {
                     ui.horizontal_wrapped(|ui| {
-                        ui.radio_value(&mut self.ui6.pick, i, if en { *en_name } else { *tr_name });
+                        ui.radio_value(&mut self.ui6.pick, i, crate::lang::t(tr_name, en_name));
                         let v4: Vec<&str> = addrs.iter().copied().filter(|a| !a.contains(':')).collect();
-                        ui.label(RichText::new(if en { *en_desc } else { *tr_desc }).weak());
+                        ui.label(RichText::new(crate::lang::t(tr_desc, en_desc)).weak());
                         if !v4.is_empty() {
                             ui.label(RichText::new(v4.join(" · ")).weak());
                         }
@@ -222,7 +221,7 @@ impl App {
                     .add_enabled(admin && !busy, primary(t("Seçilen DNS'i uygula", "Apply the selected DNS")))
                     .clicked()
                 {
-                    let (name, addrs) = (if en { DNS[self.ui6.pick].1 } else { DNS[self.ui6.pick].0 }, DNS[self.ui6.pick].4);
+                    let (name, addrs) = (crate::lang::t(DNS[self.ui6.pick].0, DNS[self.ui6.pick].1), DNS[self.ui6.pick].4);
                     let script = if addrs.is_empty() {
                         format!("{ADAPTERS} | ForEach-Object {{ Set-DnsClientServerAddress -InterfaceIndex $_.ifIndex -ResetServerAddresses -ErrorAction Stop }}; Clear-DnsClientCache")
                     } else {

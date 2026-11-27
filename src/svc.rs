@@ -304,7 +304,7 @@ pub fn scan() -> Vec<Service> {
             risk,
             publisher,
             group,
-            note: known.map_or("", |x| if crate::lang::en() { x.3 } else { x.2 }),
+            note: known.map_or("", |x| crate::lang::t(x.2, x.3)),
             name,
         });
     }
