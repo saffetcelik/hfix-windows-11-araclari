@@ -39,9 +39,38 @@ Ayrıca:
 - **Geri alınabilir.** Hızlandırma ayarlarının ve servislerin önceki değerleri yedeklenir; "Geri al" eski değeri geri koyar. İstenirse önce sistem geri yükleme noktası oluşturulur.
 - **Güvenliği azaltan ayar yok.** Defender'ı, Windows Update'i, işlemci korumalarını ya da UAC'yi kapatan ayarlar bilerek eklenmedi.
 - **Sistem tepsisi.** Pencereyi kapatmak programı kapatmaz; tepside çalışmaya devam eder.
-- **12 dil:** Türkçe, English, 简体中文, Español, Português (Brasil), Deutsch, Français, Русский, Italiano, 日本語, 한국어, العربية. Program Windows'un görüntüleme dilinde açılır (listede yoksa İngilizce). Açık / koyu tema Windows ayarını izler. İkisi de **Ayarlar** sayfasından değiştirilebilir.
+- **20 dil** ([Diller](#diller--languages) bölümüne bakın). Program Windows'un görüntüleme dilinde açılır. Açık / koyu tema Windows ayarını izler. İkisi de **Ayarlar** sayfasından değiştirilebilir.
 
 Hızlandırma ayarları [Win11Debloat](https://github.com/Raphire/Win11Debloat), [AtlasOS](https://github.com/Atlas-OS/Atlas), [ReviOS](https://github.com/meetrevision/playbook) ve [WinUtil](https://github.com/ChrisTitusTech/winutil) projelerinin ayar kataloglarından derlenmiştir; onarım komutları ve DNS listesi WinUtil ile [Optimizer](https://github.com/hellzerg/optimizer) ile aynıdır.
+
+## Diller / Languages
+
+| Kod | Dil | Kod | Dil |
+|---|---|---|---|
+| `tr` | Türkçe | `ru` | Русский (Rusça) |
+| `en` | English (İngilizce) | `uk` | Українська (Ukraynaca) |
+| `zh` | 简体中文 (Basitleştirilmiş Çince) | `pl` | Polski (Lehçe) |
+| `zh-tw` | 繁體中文 (Geleneksel Çince) | `cs` | Čeština (Çekçe) |
+| `ja` | 日本語 (Japonca) | `nl` | Nederlands (Felemenkçe) |
+| `ko` | 한국어 (Korece) | `id` | Bahasa Indonesia (Endonezce) |
+| `es` | Español (İspanyolca) | `vi` | Tiếng Việt (Vietnamca) |
+| `pt` | Português (Brasil) | `ar` | العربية (Arapça) |
+| `de` | Deutsch (Almanca) | `fa` | فارسی (Farsça) |
+| `fr` | Français (Fransızca) | `it` | Italiano (İtalyanca) |
+
+**Dil nasıl seçilir?** Ayarlar'da "Otomatik" seçiliyken (varsayılan) program Windows'un görüntüleme dilinde açılır; o dil listede yoksa İngilizce açılır. Çince için Windows bölgesine bakılır: Çin ve Singapur'da Basitleştirilmiş, Tayvan, Hong Kong ve Makao'da Geleneksel Çince. **Ayarlar → Dil** listesinden istenen dil elle seçilebilir; seçim hemen uygulanır ve saklanır.
+
+**Yazı tipleri.** Program kendi içinde yalnızca Latin, Yunan ve Kiril harflerini taşır; diğer yazılar için Windows'un kendi yazı tiplerini kullanır, bu yüzden ek bir şey kurmak gerekmez. Çince ve Japonca için Microsoft YaHei, Geleneksel Çince için Microsoft JhengHei, Korece için Malgun Gothic, Arapça, Farsça ve Vietnamca için Segoe UI kullanılır. Doğu Asya yazı tipleri büyük olduğundan (13-21 MB) yalnızca o dil seçildiğinde ya da Ayarlar sayfası açıldığında belleğe yüklenir.
+
+**Sağdan sola diller.** Arapça ve Farsça metinler program tarafından harfleri birleştirilip sağdan sola sıralanarak gösterilir. Arayüz düzeni soldan sağa kalır; uzun açıklamalar 90 karakterlik satırlara bölünür.
+
+**Desteklenmeyen diller.** Hintçe, Bengalce, Tayca gibi harflerin birleşip biçim değiştirdiği yazılar arayüz kütüphanesi (egui) tarafından doğru çizilemediği için eklenmedi.
+
+**Çeviriler hakkında.** Türkçe ve İngilizce metinler kaynak kodun içindedir. Diğer diller `diller/<kod>.json` dosyalarındadır (İngilizce metin → çeviri); bir metnin çevirisi yoksa İngilizcesi gösterilir. Çeviriler Microsoft'un resmî Windows terimleri esas alınarak yapay zekâ ile hazırlanmıştır ve anadili konuşanlarca gözden geçirilmemiştir. Düzeltmeler için ilgili JSON dosyasında değişiklik önerebilir ya da [sorun bildirebilirsiniz](../../issues).
+
+**Yeni dil eklemek:** `python tools/metinler.py cikar` çevrilecek metinleri `diller/en.json` dosyasına yazar. Çeviri `diller/<kod>.json` olarak eklenir, `python tools/metinler.py denetle` eksik çevirileri ve yanlış yer tutucuları (`{}`, `{:.1}`) bildirir. Dil, `src/lang.rs` içindeki `LANGS` listesine ve Windows dil kodu eşlemesine eklenir.
+
+*English:* the interface is available in the 20 languages above and opens in the Windows display language (English if that language is not listed). Non-Latin scripts use fonts that ship with Windows. Arabic and Persian are shaped and reordered right-to-left by the program. Hindi, Bengali, Thai and other complex-shaping scripts are not supported because the UI toolkit (egui) cannot render them correctly. Translations were produced with AI using Microsoft's official Windows terminology and have not been reviewed by native speakers; corrections to `diller/<code>.json` are welcome.
 
 ## Otomatik güncelleme
 
@@ -72,7 +101,7 @@ cargo +stable-x86_64-pc-windows-gnu build --release
 | `src/install.rs` | Kendi kendine kurulum, kısayollar, kaldırma |
 | `src/stamp.rs` | Derlenen exe'ye sürüm bilgisi ve simge ekleme (kaynak derleyicisi gerekmez) |
 | `src/lang.rs`, `diller/` | Arayüz dilleri: metinler kodda Türkçe ve İngilizce, diğer diller `diller/<kod>.json` (İngilizce metin → çeviri). Yeni metinleri listelemek için `python tools/metinler.py cikar`, çevirileri denetlemek için `python tools/metinler.py denetle` |
-| `src/fonts.rs` | Çince, Japonca, Korece ve Arapça için Windows yazı tiplerini yükleme |
+| `src/fonts.rs` | Latin dışı yazılar için Windows yazı tiplerini yükleme |
 
 ### Sürüm yayımlama
 
@@ -109,7 +138,7 @@ programı derler, test eder, imzalar, imzayı programdaki açık anahtarla doğr
 
 Everything is reversible: previous values are backed up and restored by "Undo". Tweaks that weaken security (disabling Defender, Windows Update, CPU mitigations or UAC) are deliberately left out.
 
-**Install:** download **`HFixWin11.exe`** from [Releases](../../releases/latest) and run it. It also runs on Windows 10 (1809 or later), where the 9 tweaks that exist only on Windows 11 are hidden automatically. It installs itself to `%LOCALAPPDATA%\HFixWin11`, puts a shortcut on the desktop and in the Start menu, and asks for administrator rights (UAC) on start because it changes system settings. New versions are downloaded automatically and installed only if their Ed25519 signature, version and SHA-256 digest match. The interface is available in 12 languages (Turkish, English, Simplified Chinese, Spanish, Brazilian Portuguese, German, French, Russian, Italian, Japanese, Korean, Arabic) and opens in the Windows display language; language and light / dark theme can be changed under **Settings**.
+**Install:** download **`HFixWin11.exe`** from [Releases](../../releases/latest) and run it. It also runs on Windows 10 (1809 or later), where the 9 tweaks that exist only on Windows 11 are hidden automatically. It installs itself to `%LOCALAPPDATA%\HFixWin11`, puts a shortcut on the desktop and in the Start menu, and asks for administrator rights (UAC) on start because it changes system settings. New versions are downloaded automatically and installed only if their Ed25519 signature, version and SHA-256 digest match. The interface is available in 20 languages (see [Languages](#diller--languages)) and opens in the Windows display language; language and light / dark theme can be changed under **Settings**.
 
 **Build:** `cargo +stable-x86_64-pc-windows-gnu build --release` (Rust only, no other dependencies).
 

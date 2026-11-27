@@ -10,13 +10,16 @@ use std::sync::Mutex;
 const SEGOE: u8 = 1;
 const ZH: u8 = 2;
 const KO: u8 = 8;
+const TW: u8 = 16;
+/// Dil listesindeki adlar icin yeterli olanlar (繁體 karakterleri YaHei'de de var).
 pub const ALL: u8 = SEGOE | ZH | KO;
 
 /// (bit, egui adi, dosya, koleksiyondaki sira)
-const FILES: [(u8, &str, &str, u32); 3] = [
+const FILES: [(u8, &str, &str, u32); 4] = [
     (SEGOE, "segoe", "segoeui.ttf", 0),
     (ZH, "yahei", "msyh.ttc", 0),
     (KO, "malgun", "malgun.ttf", 0),
+    (TW, "jhenghei", "msjh.ttc", 0),
 ];
 
 struct State {
@@ -24,9 +27,11 @@ struct State {
     applied: u8,
     /// Okunmus dosyalar (bir kez okunur).
     data: Vec<(u8, &'static [u8])>,
+    /// Segoe UI ana yazi tipi mi (Vietnamca: varsayilan yazi tipinde Vietnam harfleri yok)?
+    segoe_first: bool,
 }
 
-static STATE: Mutex<State> = Mutex::new(State { applied: 0, data: Vec::new() });
+static STATE: Mutex<State> = Mutex::new(State { applied: 0, data: Vec::new(), segoe_first: false });
 
 /// Gecerli dilin gerektirdigi yazi tipleri.
 fn needed_for_lang() -> u8 {
@@ -37,6 +42,7 @@ fn needed_for_lang() -> u8 {
             // icerir ve hizasi dogrudur.
             "ja" => ZH,
             "ko" => KO,
+            "zh-tw" => TW | ZH,
             _ => 0,
         }
 }
@@ -48,9 +54,11 @@ pub fn ensure(ctx: &egui::Context, extra: u8) {
     let Ok(mut st) = STATE.lock() else {
         return;
     };
-    if want & !st.applied == 0 {
+    let segoe_first = crate::lang::current().code == "vi";
+    if want & !st.applied == 0 && segoe_first == st.segoe_first {
         return;
     }
+    st.segoe_first = segoe_first;
     let dir = std::path::PathBuf::from(std::env::var("WINDIR").unwrap_or_else(|_| r"C:\Windows".into())).join("Fonts");
     for (bit, _, file, _) in FILES {
         if want & bit != 0 && !st.data.iter().any(|d| d.0 == bit) {
@@ -61,14 +69,24 @@ pub fn ensure(ctx: &egui::Context, extra: u8) {
     }
     let mut defs = egui::FontDefinitions::default();
     let mut order: Vec<&(u8, &'static [u8])> = st.data.iter().collect();
-    order.sort_by_key(|(bit, _)| *bit);
+    // Geleneksel Cince seciliyse JhengHei, YaHei'den once gelir.
+    let tw_first = crate::lang::current().code == "zh-tw";
+    order.sort_by_key(|(bit, _)| match *bit {
+        TW if tw_first => 1,
+        b => b,
+    });
     for (bit, bytes) in order {
         let (_, name, _, index) = FILES.iter().find(|f| f.0 == *bit).copied().unwrap_or(FILES[0]);
         let mut fd = egui::FontData::from_static(bytes);
         fd.index = index;
         defs.font_data.insert(name.to_owned(), fd);
         for fam in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
-            defs.families.entry(fam).or_default().push(name.to_owned());
+            let list = defs.families.entry(fam).or_default();
+            if *bit == SEGOE && segoe_first {
+                list.insert(0, name.to_owned());
+            } else {
+                list.push(name.to_owned());
+            }
         }
     }
     ctx.set_fonts(defs);
